@@ -1,0 +1,52 @@
+id: brussels_policy
+name: Brussels Policy Starter Pack
+description: EU policy, climate, security, and international affairs organizations with public career pages.
+sources:
+  - organization: Bruegel
+    url: https://www.bruegel.org/careers
+    platform_hint: generic_static
+    tags: [policy, economics, eu, think_tank]
+    region: Brussels
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: Generic careers page; may need manual review.
+  - organization: Centre for European Policy Studies
+    url: https://www.ceps.eu/ceps-vacancies/
+    platform_hint: generic_static
+    tags: [policy, eu, research, think_tank]
+    region: Brussels
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: Generic careers page; useful manual-watch source.
+  - organization: European Policy Centre
+    url: https://www.epc.eu/en/jobs
+    platform_hint: generic_static
+    tags: [policy, eu, think_tank]
+    region: Brussels
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: Generic careers page; useful manual-watch source.
+  - organization: E3G
+    url: https://www.e3g.org/about/careers/
+    platform_hint: generic_static
+    tags: [climate, energy, policy]
+    region: Europe
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: Climate policy source.
+  - organization: European Climate Foundation
+    url: https://europeanclimatefoundation.org/vacancies/
+    platform_hint: generic_static
+    tags: [climate, energy, policy]
+    region: Europe
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: Climate and grantmaking roles.
+  - organization: International Crisis Group
+    url: https://www.crisisgroup.org/who-we-are/careers
+    platform_hint: generic_static
+    tags: [international_affairs, security, policy]
+    region: Global
+    last_verified: "2026-05-29"
+    confidence: medium
+    notes: International affairs source.
