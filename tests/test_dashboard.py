@@ -6,6 +6,8 @@ from job_radar.app.server import (
     import_source_pack,
     render_dashboard,
     render_job_detail,
+    render_note_detail,
+    render_notebook,
     render_source_health_center,
     render_source_packs,
     render_wizard,
@@ -180,6 +182,101 @@ def test_dashboard_saved_views_and_job_cards(tmp_path, monkeypatch):
     assert "jr-job-card" in html
     assert "Main concern" in html
     assert "matched location: London" in html
+    get_settings.cache_clear()
+
+
+def test_notebook_renders_empty_state(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+
+    html = render_notebook()
+
+    assert "Notebook" in html
+    assert "New Note" in html
+    assert "No notes yet" in html
+    get_settings.cache_clear()
+
+
+def test_notebook_renders_created_notes(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    from job_radar.notes.store import create_note
+    create_note(body="Chatham House contact", title="Key contact", note_type="organization")
+    create_note(body="Target EU policy track", note_type="strategy", pinned=True)
+
+    html = render_notebook()
+
+    assert "Key contact" in html
+    assert "Chatham House contact" in html
+    assert "Target EU policy track" in html
+    assert "organization" in html
+    get_settings.cache_clear()
+
+
+def test_notebook_flash_message(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+
+    html = render_notebook(flash="created")
+
+    assert "Note saved" in html
+    get_settings.cache_clear()
+
+
+def test_notebook_type_filter(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    from job_radar.notes.store import create_note
+    create_note(body="Strategy note", note_type="strategy")
+    create_note(body="General note", note_type="general")
+
+    html = render_notebook(filter_type="strategy")
+
+    assert "Strategy note" in html
+    assert "General note" not in html
+    get_settings.cache_clear()
+
+
+def test_note_detail_renders(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    from job_radar.notes.store import create_note
+    note = create_note(body="Follow up with E3G", title="E3G contact", tags=["eu", "climate"])
+
+    html = render_note_detail(note["id"])
+
+    assert "E3G contact" in html
+    assert "Follow up with E3G" in html
+    assert "eu" in html
+    assert "Archive" in html
+    assert "Delete" in html
+    get_settings.cache_clear()
+
+
+def test_note_detail_missing_id(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+
+    html = render_note_detail("nonexistent-id")
+
+    assert "Note Not Found" in html or "not found" in html.lower()
+    get_settings.cache_clear()
+
+
+def test_dashboard_includes_notebook_nav(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+
+    html = render_dashboard()
+
+    assert "/notebook" in html
     get_settings.cache_clear()
 
 
