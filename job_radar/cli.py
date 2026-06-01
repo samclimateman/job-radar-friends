@@ -172,13 +172,13 @@ def main(argv: list[str] | None = None) -> int:
 
 def _example_rubric() -> dict:
     return {
-        "target_locations": ["Berlin", "Brussels", "London", "Remote Europe"],
-        "preferred_industries": ["energy", "climate", "industrial policy"],
-        "role_types": ["policy", "strategy", "research", "advisory"],
-        "seniority": ["manager", "senior analyst", "lead"],
-        "positive_keywords": ["energy security", "industrial decarbonization"],
-        "negative_keywords": ["sales", "marketing", "junior admin"],
-        "dealbreakers": ["US-only", "requires native German"],
+        "target_locations": ["London", "New York", "Remote"],
+        "preferred_industries": ["technology", "research", "nonprofit"],
+        "role_types": ["analyst", "manager", "coordinator"],
+        "seniority": ["senior", "lead", "manager"],
+        "positive_keywords": ["strategy", "data", "communications"],
+        "negative_keywords": ["sales", "unpaid", "junior admin"],
+        "dealbreakers": ["requires security clearance", "no remote"],
         "weights": {
             "location": 0.2,
             "role_type": 0.25,

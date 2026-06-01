@@ -18,10 +18,33 @@ def _path(url: str) -> str:
     return parsed.path.strip("/")
 
 
+_RSS_EXTENSIONS = re.compile(r"\.(rss|xml|atom)$", re.IGNORECASE)
+_RSS_PATH_HINTS = re.compile(r"/(feed|rss|atom)(/|$)", re.IGNORECASE)
+_RSS_QUERY_HINTS = re.compile(r"(^|&)(feed|format)=(rss|atom|xml)", re.IGNORECASE)
+
+
+def _is_rss_url(url: str) -> bool:
+    parsed = urlparse(url if "://" in url else f"https://{url}")
+    path = parsed.path
+    return bool(
+        _RSS_EXTENSIONS.search(path)
+        or _RSS_PATH_HINTS.search(path)
+        or _RSS_QUERY_HINTS.search(parsed.query)
+    )
+
+
 def detect_source(url: str) -> SourceDetection:
     host = _host(url)
     path = _path(url)
     clean_url = url.strip()
+
+    if _is_rss_url(url):
+        return SourceDetection(
+            "rss",
+            "rss_atom",
+            "RSS/Atom feed detected",
+            {"feed_url": clean_url},
+        )
 
     if "greenhouse.io" in host or "job-boards.greenhouse.io" in host:
         token = path.split("/")[0] if path else ""

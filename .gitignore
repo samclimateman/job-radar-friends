@@ -9,3 +9,7 @@ data/
 dist/
 *.db
 *.sqlite
+# Tauri / Rust build artifacts
+src-tauri/target/
+# Runtime files
+response_cache.json

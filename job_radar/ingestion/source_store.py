@@ -94,6 +94,13 @@ def list_sources() -> list[StoredSource]:
     ]
 
 
+def set_source_needs_review(source_id: str) -> None:
+    execute(
+        "UPDATE sources SET status = 'needs_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (source_id,),
+    )
+
+
 def mark_manual_checked(source_id: str) -> None:
     init_db()
     row = execute("SELECT * FROM sources WHERE id = ?", (source_id,))
