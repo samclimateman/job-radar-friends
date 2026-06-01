@@ -2,11 +2,24 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from job_radar.config.settings import get_settings
 from job_radar.db.client import execute
 from job_radar.ingestion.runner import run_ingestion
 from job_radar.ingestion.source_store import add_source
 from job_radar.scoring.store import save_rubric
+
+
+@pytest.fixture(autouse=True)
+def disable_response_cache(monkeypatch):
+    """Lifecycle tests need every scan to run a full upsert so lifecycle
+    transitions and missed_scans accumulate correctly.  The cache is tested
+    separately in test_response_cache.py."""
+    monkeypatch.setattr(
+        "job_radar.ingestion.runner.response_cache.is_unchanged",
+        lambda *_: False,
+    )
 
 
 class MockResponse:

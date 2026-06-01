@@ -879,25 +879,38 @@ def _stats() -> dict[str, int]:
     }
 
 
+_ACTIVE = (
+    "j.is_live = 1 AND j.is_excluded = 0 "
+    "AND j.lifecycle_status NOT IN ('probably_closed', 'dead')"
+)
+
+
 def _dashboard_jobs(view: str) -> list[dict]:
-    where = ""
     order = "ORDER BY COALESCE(js.score, -1) DESC, j.first_seen_at DESC"
     if view == "new":
+        where = f"WHERE {_ACTIVE}"
         order = "ORDER BY j.first_seen_at DESC"
     elif view == "closing":
-        where = "WHERE j.deadline IS NOT NULL AND j.deadline != ''"
+        where = f"WHERE {_ACTIVE} AND j.deadline IS NOT NULL AND j.deadline != ''"
         order = "ORDER BY j.deadline ASC, COALESCE(js.score, -1) DESC"
     elif view == "stretch":
-        where = "WHERE COALESCE(js.score, 0) BETWEEN 45 AND 69 AND j.is_excluded = 0"
+        where = f"WHERE {_ACTIVE} AND COALESCE(js.score, 0) BETWEEN 45 AND 69"
         order = "ORDER BY COALESCE(js.score, -1) DESC"
     elif view == "needs_review":
         where = "WHERE j.is_excluded = 1 OR js.score IS NULL"
     elif view == "excluded":
-        where = "WHERE j.is_excluded = 1 OR j.is_live = 0"
+        where = (
+            "WHERE j.is_excluded = 1 OR j.is_live = 0 "
+            "OR j.lifecycle_status IN ('probably_closed', 'dead')"
+        )
     elif view == "organization":
+        where = f"WHERE {_ACTIVE}"
         order = "ORDER BY LOWER(COALESCE(j.organization, '')), COALESCE(js.score, -1) DESC"
     elif view == "location":
+        where = f"WHERE {_ACTIVE}"
         order = "ORDER BY LOWER(COALESCE(j.location, '')), COALESCE(js.score, -1) DESC"
+    else:
+        where = f"WHERE {_ACTIVE}"
 
     return execute(
         f"""

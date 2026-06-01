@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sources (
     config_json TEXT NOT NULL DEFAULT '{}',
     status TEXT NOT NULL DEFAULT 'active',
     detection_note TEXT,
+    notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     is_excluded INTEGER NOT NULL DEFAULT 0,
     exclusion_reason TEXT,
     user_status TEXT NOT NULL DEFAULT 'new',
+    snooze_until TEXT,
     UNIQUE(source_id, source_url)
 );
 

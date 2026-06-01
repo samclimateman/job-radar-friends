@@ -55,6 +55,8 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
     source_cols = {r["name"] for r in conn.execute("PRAGMA table_info(sources)").fetchall()}
     if "config_json" not in source_cols:
         conn.execute("ALTER TABLE sources ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'")
+    if "notes" not in source_cols:
+        conn.execute("ALTER TABLE sources ADD COLUMN notes TEXT")
 
     job_cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()}
     if "description_hash" not in job_cols:
@@ -67,6 +69,8 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE jobs ADD COLUMN missed_scans INTEGER NOT NULL DEFAULT 0")
     if "lifecycle_status" not in job_cols:
         conn.execute("ALTER TABLE jobs ADD COLUMN lifecycle_status TEXT NOT NULL DEFAULT 'active'")
+    if "snooze_until" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN snooze_until TEXT")
 
     sr_cols = {r["name"] for r in conn.execute("PRAGMA table_info(source_runs)").fetchall()}
     if "jobs_changed" not in sr_cols:

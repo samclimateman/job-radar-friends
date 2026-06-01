@@ -17,12 +17,14 @@ from job_radar.ingestion.sources.personio import PersonioScraper
 from job_radar.ingestion.sources.rss import RssScraper
 from job_radar.ingestion.sources.smartrecruiters import SmartRecruitersScraper
 from job_radar.ingestion.sources.workable import WorkableScraper
+import job_radar.ingestion.response_cache as response_cache
 from job_radar.ingestion.store import (
     finish_run,
     finish_source_run,
     start_run,
     start_source_run,
     store_jobs,
+    touch_source_jobs,
 )
 
 SCRAPERS = {
@@ -48,6 +50,7 @@ class SourceIngestionResult:
     jobs_found: int = 0
     new_jobs_found: int = 0
     jobs_changed: int = 0
+    skipped: bool = False
     fetch_ms: int | None = None
     total_ms: int | None = None
     error: str | None = None
@@ -104,10 +107,28 @@ def _ingest_source(run_id: str, source: StoredSource) -> SourceIngestionResult:
         jobs = _fetch_jobs(scraper_cls, source)
         fetch_ms = int((time.monotonic() - fetch_start) * 1000)
 
+        # Skip upsert when the URL set matches last successful run
+        seen_urls = {j.source_url for j in jobs}
+        url_hash = response_cache.compute_url_hash(seen_urls)
+        if seen_urls and response_cache.is_unchanged(source.id, url_hash):
+            touch_source_jobs(source.id)
+            total_ms = int((time.monotonic() - total_start) * 1000)
+            finish_source_run(
+                source_run_id, source,
+                status="success", jobs_found=len(jobs),
+                fetch_ms=fetch_ms, total_ms=total_ms,
+            )
+            return SourceIngestionResult(
+                source.id, source.url, source.platform, True,
+                jobs_found=len(jobs), skipped=True,
+                fetch_ms=fetch_ms, total_ms=total_ms,
+            )
+
         upsert_start = time.monotonic()
         stored = store_jobs(run_id, source, jobs)
         upsert_ms = int((time.monotonic() - upsert_start) * 1000)
 
+        response_cache.update(source.id, url_hash)
         total_ms = int((time.monotonic() - total_start) * 1000)
         finish_source_run(
             source_run_id, source,
