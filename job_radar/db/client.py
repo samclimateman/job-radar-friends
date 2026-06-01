@@ -23,6 +23,11 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    # Checkpoint on every connection close so the main .db file is always current
+    # for file-level backups.  The runner additionally calls PRAGMA wal_checkpoint
+    # (TRUNCATE) after each full scan as an explicit sync point.
+    conn.execute("PRAGMA wal_autocheckpoint = 1")
     return conn
 
 
@@ -46,10 +51,42 @@ def execute(sql: str, params: tuple[Any, ...] = (), path: Path | None = None) ->
 
 
 def _ensure_columns(conn: sqlite3.Connection) -> None:
-    """Apply tiny compatibility migrations for existing local v0.1 databases."""
-    source_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sources)").fetchall()}
-    if "config_json" not in source_columns:
+    """Apply additive column migrations for existing local databases."""
+    source_cols = {r["name"] for r in conn.execute("PRAGMA table_info(sources)").fetchall()}
+    if "config_json" not in source_cols:
         conn.execute("ALTER TABLE sources ADD COLUMN config_json TEXT NOT NULL DEFAULT '{}'")
+
+    job_cols = {r["name"] for r in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "description_hash" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN description_hash TEXT")
+    if "last_changed_at" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN last_changed_at TEXT")
+    if "times_seen" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN times_seen INTEGER NOT NULL DEFAULT 1")
+    if "missed_scans" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN missed_scans INTEGER NOT NULL DEFAULT 0")
+    if "lifecycle_status" not in job_cols:
+        conn.execute("ALTER TABLE jobs ADD COLUMN lifecycle_status TEXT NOT NULL DEFAULT 'active'")
+
+    sr_cols = {r["name"] for r in conn.execute("PRAGMA table_info(source_runs)").fetchall()}
+    if "jobs_changed" not in sr_cols:
+        conn.execute("ALTER TABLE source_runs ADD COLUMN jobs_changed INTEGER NOT NULL DEFAULT 0")
+    if "jobs_unchanged" not in sr_cols:
+        conn.execute("ALTER TABLE source_runs ADD COLUMN jobs_unchanged INTEGER NOT NULL DEFAULT 0")
+    if "fetch_ms" not in sr_cols:
+        conn.execute("ALTER TABLE source_runs ADD COLUMN fetch_ms INTEGER")
+    if "upsert_ms" not in sr_cols:
+        conn.execute("ALTER TABLE source_runs ADD COLUMN upsert_ms INTEGER")
+    if "total_ms" not in sr_cols:
+        conn.execute("ALTER TABLE source_runs ADD COLUMN total_ms INTEGER")
+
+    sh_cols = {r["name"] for r in conn.execute("PRAGMA table_info(source_health)").fetchall()}
+    if "confidence_label" not in sh_cols:
+        conn.execute("ALTER TABLE source_health ADD COLUMN confidence_label TEXT NOT NULL DEFAULT 'unknown'")
+    if "confidence_score" not in sh_cols:
+        conn.execute("ALTER TABLE source_health ADD COLUMN confidence_score INTEGER NOT NULL DEFAULT 0")
+    if "confidence_note" not in sh_cols:
+        conn.execute("ALTER TABLE source_health ADD COLUMN confidence_note TEXT")
 
 
 def _backfill_source_config(conn: sqlite3.Connection) -> None:

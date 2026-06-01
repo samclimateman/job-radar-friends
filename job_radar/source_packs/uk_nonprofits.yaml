@@ -1,0 +1,93 @@
+id: uk_nonprofits
+name: UK Nonprofits & Charities
+description: UK-based charities, foundations, and civil society organisations with public career pages.
+sources:
+  - organization: Chatham House
+    url: https://www.chathamhouse.org/about-us/careers
+    platform_hint: generic_static
+    tags: [policy, international_affairs, research, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Leading international affairs think tank. Generic careers page.
+
+  - organization: Oxfam GB
+    url: https://jobs.oxfam.org.uk/
+    platform_hint: api
+    tags: [international_development, humanitarian, nonprofit]
+    region: Oxford
+    last_verified: "2026-06-01"
+    confidence: high
+    notes: Dedicated jobs portal with structured listings.
+
+  - organization: Save the Children UK
+    url: https://jobs.savethechildren.org.uk/
+    platform_hint: api
+    tags: [international_development, humanitarian, nonprofit]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: high
+    notes: Dedicated jobs portal.
+
+  - organization: Wellcome Trust
+    url: https://wellcome.org/jobs
+    platform_hint: generic_static
+    tags: [health, science, research, foundation]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Health and science funder. Generic careers listing.
+
+  - organization: Joseph Rowntree Foundation
+    url: https://www.jrf.org.uk/about/work-for-us
+    platform_hint: generic_static
+    tags: [policy, poverty, research, foundation]
+    region: York
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: UK poverty research and policy.
+
+  - organization: Nuffield Foundation
+    url: https://www.nuffieldfoundation.org/about/jobs
+    platform_hint: generic_static
+    tags: [research, education, policy, foundation]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Education and social policy funder.
+
+  - organization: Institute for Government
+    url: https://www.instituteforgovernment.org.uk/about/vacancies
+    platform_hint: generic_static
+    tags: [policy, government, research, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: UK governance and public policy think tank.
+
+  - organization: Resolution Foundation
+    url: https://www.resolutionfoundation.org/about/jobs/
+    platform_hint: generic_static
+    tags: [policy, economics, research, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Living standards and inequality research.
+
+  - organization: Carbon Trust
+    url: https://www.carbontrust.com/about-us/careers
+    platform_hint: generic_static
+    tags: [climate, energy, sustainability, nonprofit]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Climate and clean energy advisory.
+
+  - organization: ClientEarth
+    url: https://www.clientearth.org/latest/jobs/
+    platform_hint: generic_static
+    tags: [climate, environment, law, nonprofit]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Environmental law organisation.

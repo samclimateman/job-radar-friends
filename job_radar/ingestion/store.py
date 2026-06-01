@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import uuid4
 
 from job_radar.db.client import execute, init_db
+from job_radar.ingestion.confidence import update_source_confidence
 from job_radar.ingestion.models import ScrapedJob
 from job_radar.ingestion.source_store import StoredSource
 from job_radar.scoring.deterministic import score_job
 from job_radar.scoring.store import active_rubric, save_job_score
+
+# Missed-scan thresholds for lifecycle transitions
+_PROBABLY_CLOSED_THRESHOLD = 3
+_DEAD_THRESHOLD = 7
 
 
 @dataclass
 class StoreResult:
     jobs_found: int = 0
     new_jobs_found: int = 0
+    jobs_changed: int = 0
+    jobs_unchanged: int = 0
+
+
+def _description_hash(text: str) -> str:
+    return hashlib.sha1(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
 def start_run(source_count: int) -> str:
@@ -59,6 +71,11 @@ def finish_source_run(
     status: str,
     jobs_found: int = 0,
     new_jobs_found: int = 0,
+    jobs_changed: int = 0,
+    jobs_unchanged: int = 0,
+    fetch_ms: int | None = None,
+    upsert_ms: int | None = None,
+    total_ms: int | None = None,
     error: str | None = None,
 ) -> None:
     execute(
@@ -68,10 +85,26 @@ def finish_source_run(
             status = ?,
             jobs_found = ?,
             new_jobs_found = ?,
+            jobs_changed = ?,
+            jobs_unchanged = ?,
+            fetch_ms = ?,
+            upsert_ms = ?,
+            total_ms = ?,
             error = ?
         WHERE id = ?
         """,
-        (status, jobs_found, new_jobs_found, error, source_run_id),
+        (
+            status,
+            jobs_found,
+            new_jobs_found,
+            jobs_changed,
+            jobs_unchanged,
+            fetch_ms,
+            upsert_ms,
+            total_ms,
+            error,
+            source_run_id,
+        ),
     )
     execute(
         """
@@ -104,20 +137,66 @@ def finish_source_run(
             1 if error and "404" in error else 0,
         ),
     )
+    update_source_confidence(source.id, source.status)
+
+
+def touch_source_jobs(source_id: str) -> int:
+    """
+    Mark all live jobs for a source as still-active without re-upserting.
+
+    Called when response hashing shows the URL set is unchanged — we skip
+    normalize/score/upsert but still reset missed_scans so jobs don't drift
+    toward probably_closed.  Returns the number of rows updated.
+    """
+    rows = execute(
+        """
+        UPDATE jobs
+        SET last_seen_at     = CURRENT_TIMESTAMP,
+            missed_scans     = 0,
+            lifecycle_status = 'active'
+        WHERE source_id      = ?
+          AND is_live        = 1
+          AND lifecycle_status NOT IN ('dead', 'excluded')
+        """,
+        (source_id,),
+    )
+    return len(rows) if rows is not None else 0
 
 
 def store_jobs(run_id: str, source: StoredSource, jobs: list[ScrapedJob]) -> StoreResult:
     result = StoreResult(jobs_found=len(jobs))
-    seen_urls = {job.source_url for job in jobs}
+    seen_urls: set[str] = set()
     rubric_payload = active_rubric()
 
     for job in jobs:
+        d_hash = _description_hash(job.raw_description or "")
+        seen_urls.add(job.source_url)
+
         existing = execute(
-            "SELECT id FROM jobs WHERE source_id = ? AND source_url = ?",
+            "SELECT id, description_hash, lifecycle_status FROM jobs WHERE source_id = ? AND source_url = ?",
             (source.id, job.source_url),
         )
+
         if existing:
             job_id = existing[0]["id"]
+            old_hash = existing[0]["description_hash"]
+            old_lifecycle = existing[0]["lifecycle_status"] or "active"
+            description_changed = old_hash != d_hash
+
+            if old_lifecycle in ("probably_closed", "dead"):
+                # Job was gone, now back — flag it regardless of description change
+                new_lifecycle = "reappeared"
+                if description_changed:
+                    result.jobs_changed += 1
+                else:
+                    result.jobs_unchanged += 1
+            elif description_changed:
+                result.jobs_changed += 1
+                new_lifecycle = "changed"
+            else:
+                result.jobs_unchanged += 1
+                new_lifecycle = "active"
+
             execute(
                 """
                 UPDATE jobs
@@ -126,17 +205,36 @@ def store_jobs(run_id: str, source: StoredSource, jobs: list[ScrapedJob]) -> Sto
                     organization = ?,
                     location = ?,
                     remote_status = ?,
-                    source_url = ?,
                     source_job_id = ?,
                     raw_description = ?,
                     normalized_description = ?,
+                    description_hash = ?,
                     raw_payload = ?,
                     deadline = ?,
                     last_seen_at = CURRENT_TIMESTAMP,
+                    last_changed_at = CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE last_changed_at END,
+                    times_seen = times_seen + 1,
+                    missed_scans = 0,
+                    lifecycle_status = ?,
                     is_live = 1
                 WHERE id = ?
                 """,
-                (*_job_params(run_id, source, job), job_id),
+                (
+                    run_id,
+                    job.title,
+                    job.organization or source.organization,
+                    job.location,
+                    job.remote_status,
+                    job.source_job_id,
+                    job.raw_description or "",
+                    " ".join((job.raw_description or "").split()),
+                    d_hash,
+                    json.dumps(job.raw_payload or {}),
+                    job.deadline,
+                    description_changed,
+                    new_lifecycle,
+                    job_id,
+                ),
             )
         else:
             result.new_jobs_found += 1
@@ -146,33 +244,112 @@ def store_jobs(run_id: str, source: StoredSource, jobs: list[ScrapedJob]) -> Sto
                 INSERT INTO jobs (
                     id, source_id, run_id, title, organization, location, remote_status,
                     source_url, source_job_id, raw_description, normalized_description,
-                    raw_payload, deadline
+                    description_hash, raw_payload, deadline, times_seen, lifecycle_status
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'new')
                 """,
-                (job_id, source.id, *_job_params(run_id, source, job)),
+                (
+                    job_id,
+                    source.id,
+                    run_id,
+                    job.title,
+                    job.organization or source.organization,
+                    job.location,
+                    job.remote_status,
+                    job.source_url,
+                    job.source_job_id,
+                    job.raw_description or "",
+                    " ".join((job.raw_description or "").split()),
+                    d_hash,
+                    json.dumps(job.raw_payload or {}),
+                    job.deadline,
+                ),
             )
-        if rubric_payload:
-            _score_stored_job(job_id, job, rubric_payload)
 
+        _insert_observation(job_id, source, run_id, job, d_hash)
+
+        is_new = not bool(existing)
+        desc_changed = existing and existing[0]["description_hash"] != d_hash
+        if rubric_payload:
+            _score_stored_job(job_id, job, rubric_payload, is_new=is_new, description_changed=bool(desc_changed))
+
+    # On a successful scan, update lifecycle for jobs that weren't seen
     if seen_urls:
-        placeholders = ",".join("?" for _ in seen_urls)
-        execute(
-            f"""
-            UPDATE jobs
-            SET is_live = 0, last_seen_at = CURRENT_TIMESTAMP
-            WHERE source_id = ?
-              AND is_live = 1
-              AND source_url NOT IN ({placeholders})
-            """,
-            (source.id, *seen_urls),
-        )
+        _update_missing_jobs(source.id, seen_urls)
+    elif not jobs:
+        # Zero jobs from a successful scan — don't penalise missing jobs;
+        # the source may simply have no open roles right now.
+        pass
 
     return result
 
 
-def _score_stored_job(job_id: str, job: ScrapedJob, rubric_payload) -> None:
+def _insert_observation(
+    job_id: str,
+    source: StoredSource,
+    run_id: str,
+    job: ScrapedJob,
+    d_hash: str,
+) -> None:
+    execute(
+        """
+        INSERT INTO job_observations (id, job_id, source_id, run_id, title_raw, url_raw, description_hash, connector_used)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (str(uuid4()), job_id, source.id, run_id, job.title, job.source_url, d_hash, source.platform),
+    )
+
+
+def _update_missing_jobs(source_id: str, seen_urls: set[str]) -> None:
+    """Increment missed_scans for active jobs not returned in this successful scan."""
+    placeholders = ",".join("?" for _ in seen_urls)
+
+    # Increment missed_scans for unseen jobs
+    execute(
+        f"""
+        UPDATE jobs
+        SET missed_scans = missed_scans + 1,
+            is_live = CASE WHEN missed_scans + 1 >= ? THEN 0 ELSE is_live END,
+            lifecycle_status = CASE
+                WHEN missed_scans + 1 >= ? THEN 'dead'
+                WHEN missed_scans + 1 >= ? THEN 'probably_closed'
+                ELSE lifecycle_status
+            END
+        WHERE source_id = ?
+          AND lifecycle_status NOT IN ('dead', 'excluded')
+          AND source_url NOT IN ({placeholders})
+        """,
+        (
+            _DEAD_THRESHOLD,
+            _DEAD_THRESHOLD,
+            _PROBABLY_CLOSED_THRESHOLD,
+            source_id,
+            *seen_urls,
+        ),
+    )
+
+    # Mark reappeared: jobs that were probably_closed/dead but are now seen again
+    # (handled in the main loop via lifecycle_status check on existing rows)
+
+
+def _score_stored_job(
+    job_id: str,
+    job: ScrapedJob,
+    rubric_payload,
+    *,
+    is_new: bool = True,
+    description_changed: bool = False,
+) -> None:
     rubric_id, rubric = rubric_payload
+
+    # Delta classification: skip if nothing changed and rubric is the same
+    if not is_new and not description_changed:
+        existing_score = execute(
+            "SELECT rubric_id FROM job_scores WHERE job_id = ?", (job_id,)
+        )
+        if existing_score and existing_score[0]["rubric_id"] == rubric_id:
+            return
+
     score = score_job(job, rubric)
     explanation = {
         "matched": score.matched,
@@ -192,21 +369,4 @@ def _score_stored_job(job_id: str, job: ScrapedJob, rubric_payload) -> None:
             "; ".join(score.excluded) if score.excluded else None,
             job_id,
         ),
-    )
-
-
-def _job_params(run_id: str, source: StoredSource, job: ScrapedJob) -> tuple:
-    description = job.raw_description or ""
-    return (
-        run_id,
-        job.title,
-        job.organization or source.organization,
-        job.location,
-        job.remote_status,
-        job.source_url,
-        job.source_job_id,
-        description,
-        " ".join(description.split()),
-        json.dumps(job.raw_payload or {}),
-        job.deadline,
     )

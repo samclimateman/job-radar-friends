@@ -1,0 +1,93 @@
+id: defence_security
+name: Defence & Security Research
+description: Defence policy, security studies, and strategic affairs organisations across Europe and North America.
+sources:
+  - organization: IISS (International Institute for Strategic Studies)
+    url: https://www.iiss.org/about-us/careers/
+    platform_hint: generic_static
+    tags: [defence, security, research, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Leading defence and security think tank.
+
+  - organization: RUSI (Royal United Services Institute)
+    url: https://rusi.org/about/vacancies
+    platform_hint: generic_static
+    tags: [defence, security, research, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: UK defence and security research institute.
+
+  - organization: SIPRI (Stockholm International Peace Research Institute)
+    url: https://www.sipri.org/about/vacancies
+    platform_hint: generic_static
+    tags: [defence, security, arms_control, research]
+    region: Stockholm
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: International peace and security research.
+
+  - organization: Munich Security Conference
+    url: https://securityconference.org/en/msc/jobs/
+    platform_hint: generic_static
+    tags: [security, foreign_policy, conferences]
+    region: Munich
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Annual security conference secretariat roles.
+
+  - organization: European Council on Foreign Relations
+    url: https://ecfr.eu/about/vacancies/
+    platform_hint: generic_static
+    tags: [foreign_policy, europe, research, think_tank]
+    region: Berlin
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: European foreign policy think tank.
+
+  - organization: Stiftung Wissenschaft und Politik (SWP)
+    url: https://www.swp-berlin.org/en/about-swp/careers
+    platform_hint: generic_static
+    tags: [foreign_policy, security, research, think_tank]
+    region: Berlin
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: German foreign and security policy research.
+
+  - organization: European Defence Agency
+    url: https://www.eda.europa.eu/jobs/current-vacancies
+    platform_hint: generic_static
+    tags: [defence, eu, procurement, policy]
+    region: Brussels
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: EU defence agency. Vacancies page may require monitoring.
+
+  - organization: NATO (Allied Command Transformation)
+    url: https://www.act.nato.int/human-resources/civilian-hr/job-opportunities
+    platform_hint: generic_static
+    tags: [defence, nato, military, policy]
+    region: Norfolk VA / Europe
+    last_verified: "2026-06-01"
+    confidence: low
+    notes: NATO civilian roles. Page structure changes; manual watch recommended.
+
+  - organization: Centre for European Reform
+    url: https://www.cer.eu/about/job-opportunities
+    platform_hint: generic_static
+    tags: [europe, policy, security, think_tank]
+    region: London
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: EU policy and security research.
+
+  - organization: Wilton Park
+    url: https://www.wiltonpark.org.uk/about/vacancies/
+    platform_hint: generic_static
+    tags: [foreign_policy, security, conferences, uk_government]
+    region: Sussex
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: UK government-linked international dialogue forum.

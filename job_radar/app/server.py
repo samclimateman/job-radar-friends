@@ -73,6 +73,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/backup/database":
             db_path = get_settings().db_path
             init_db()
+            execute("PRAGMA wal_checkpoint(TRUNCATE)")
             self._send_download("job-radar.sqlite", "application/octet-stream", db_path.read_bytes())
             return
         if parsed.path == "/wizard":
@@ -83,6 +84,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/source-health":
             self._send_html(render_source_health_center())
+            return
+        if parsed.path == "/source-builder":
+            self._send_html(render_source_builder())
             return
         params = parse_qs(parsed.query)
         self._send_html(render_dashboard(view=_first(params, "view") or "best"))
@@ -173,6 +177,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path == "/onboarding/complete":
             set_state("onboarding_complete", True)
             self._redirect("/")
+            return
+
+        if self.path == "/source-builder/test":
+            url = _first(form, "url") or ""
+            organization = _first(form, "organization") or None
+            self._send_html(render_source_builder(test_url=url.strip(), organization=organization))
+            return
+
+        if self.path == "/source-builder/save":
+            url = _first(form, "url") or ""
+            organization = _first(form, "organization") or None
+            manual = _first(form, "manual") == "1"
+            if url.strip():
+                source = add_source(url.strip(), organization=organization)
+                if manual:
+                    from job_radar.ingestion.source_store import set_source_needs_review
+                    set_source_needs_review(source.id)
+            self._redirect("/source-health")
             return
 
         if self.path == "/source-packs/import":
@@ -268,13 +290,15 @@ def render_dashboard(
         """
         SELECT s.id, s.url, s.organization, s.platform, s.parser_type, s.status,
                h.last_checked_at, h.jobs_found, h.new_jobs_found, h.error_status,
-               h.manual_review_needed, h.likely_broken_url
+               h.manual_review_needed, h.likely_broken_url,
+               h.confidence_label, h.confidence_score, h.confidence_note
         FROM sources s
         LEFT JOIN source_health h ON h.source_id = s.id
         ORDER BY s.created_at, s.url
         """
     )
 
+    radar = _radar_section()
     job_rows = "\n".join(_job_row(row) for row in jobs) or _empty_row("No jobs ingested yet.", 11)
     source_rows = "\n".join(_source_row(row) for row in sources) or _empty_row("No sources saved yet.", 9)
 
@@ -304,6 +328,7 @@ def render_dashboard(
     <a class="active" href="#ranked">Ranked Jobs</a>
     <a href="/wizard">Onboarding</a>
     <a href="/source-packs">Source Packs</a>
+    <a href="/source-builder">Source Builder</a>
     <a href="/source-health">Source Health</a>
     <a href="#setup">AI Setup</a>
     <a href="#strategy">Strategy</a>
@@ -317,6 +342,7 @@ def render_dashboard(
 
   <main>
     {scan_report}
+    {radar}
     <section class="{setup_class}" id="add">
       <div class="jr-band-heading">
         <h2>First-Run Setup</h2>
@@ -380,35 +406,35 @@ def render_dashboard(
       <form method="post" action="/strategy/save" class="jr-strategy-grid">
         <label>
           <span>Search narrative</span>
-          <textarea name="strategy_narrative" rows="5" placeholder="Policy, strategy, research, advisory roles in London, Berlin, DC, remote US, or remote Europe.">{_esc(rubric.get("strategy_narrative", ""))}</textarea>
+          <textarea name="strategy_narrative" rows="5" placeholder="e.g. Senior research or strategy roles at nonprofits or foundations, preferably remote or in major cities.">{_esc(rubric.get("strategy_narrative", ""))}</textarea>
         </label>
         <label>
           <span>Target locations</span>
-          <textarea name="target_locations" rows="5" placeholder="London&#10;Berlin&#10;Washington DC&#10;Remote US">{_esc(rubric.get("target_locations", ""))}</textarea>
+          <textarea name="target_locations" rows="5" placeholder="e.g.&#10;London&#10;New York&#10;Remote">{_esc(rubric.get("target_locations", ""))}</textarea>
         </label>
         <label>
           <span>Industries</span>
-          <textarea name="preferred_industries" rows="4" placeholder="climate&#10;AI safety&#10;public policy&#10;energy">{_esc(rubric.get("preferred_industries", ""))}</textarea>
+          <textarea name="preferred_industries" rows="4" placeholder="e.g.&#10;technology&#10;research&#10;nonprofit&#10;consulting">{_esc(rubric.get("preferred_industries", ""))}</textarea>
         </label>
         <label>
           <span>Role types</span>
-          <textarea name="role_types" rows="4" placeholder="policy&#10;strategy&#10;research&#10;advisory">{_esc(rubric.get("role_types", ""))}</textarea>
+          <textarea name="role_types" rows="4" placeholder="e.g.&#10;analyst&#10;manager&#10;coordinator&#10;director">{_esc(rubric.get("role_types", ""))}</textarea>
         </label>
         <label>
           <span>Seniority</span>
-          <textarea name="seniority" rows="4" placeholder="senior&#10;lead&#10;manager&#10;director">{_esc(rubric.get("seniority", ""))}</textarea>
+          <textarea name="seniority" rows="4" placeholder="e.g.&#10;senior&#10;lead&#10;manager&#10;director">{_esc(rubric.get("seniority", ""))}</textarea>
         </label>
         <label>
           <span>Positive keywords</span>
-          <textarea name="positive_keywords" rows="4" placeholder="industrial policy&#10;energy security&#10;go-to-market strategy">{_esc(rubric.get("positive_keywords", ""))}</textarea>
+          <textarea name="positive_keywords" rows="4" placeholder="e.g.&#10;strategy&#10;data&#10;communications">{_esc(rubric.get("positive_keywords", ""))}</textarea>
         </label>
         <label>
           <span>Negative keywords</span>
-          <textarea name="negative_keywords" rows="4" placeholder="sales&#10;junior admin&#10;unpaid">{_esc(rubric.get("negative_keywords", ""))}</textarea>
+          <textarea name="negative_keywords" rows="4" placeholder="e.g.&#10;sales&#10;unpaid&#10;junior admin">{_esc(rubric.get("negative_keywords", ""))}</textarea>
         </label>
         <label>
           <span>Dealbreakers</span>
-          <textarea name="dealbreakers" rows="4" placeholder="requires native German&#10;US-only if not US user&#10;unpaid internship">{_esc(rubric.get("dealbreakers", ""))}</textarea>
+          <textarea name="dealbreakers" rows="4" placeholder="e.g.&#10;requires security clearance&#10;no remote&#10;unpaid internship">{_esc(rubric.get("dealbreakers", ""))}</textarea>
         </label>
         <button class="jr-button" type="submit">Save Strategy</button>
       </form>
@@ -443,7 +469,6 @@ def render_dashboard(
               <th>Why</th>
               <th>Seen</th>
               <th>Platform</th>
-              <th>Live</th>
               <th>Source</th>
               <th>Actions</th>
             </tr>
@@ -543,6 +568,125 @@ def render_wizard() -> str:
     </section>
     """
     return _page("Onboarding", body)
+
+
+def render_source_builder(
+    test_url: str = "",
+    organization: str | None = None,
+) -> str:
+    result_html = ""
+    if test_url:
+        result_html = _source_builder_result(test_url, organization)
+
+    body = f"""
+    <section class="jr-band detail">
+      <div class="jr-band-heading">
+        <h2>Source Builder</h2>
+        <a class="jr-small-link" href="/">Back to Dashboard</a>
+      </div>
+      <p class="jr-help">
+        Paste any career-page or feed URL to test whether Job Radar can extract jobs from it.
+        No Python editing required.
+      </p>
+      <form method="post" action="/source-builder/test" class="jr-source-form">
+        <label>
+          <span>Organization name</span>
+          <input name="organization" type="text" value="{_esc(organization or "")}" placeholder="e.g. Acme Foundation">
+        </label>
+        <label class="wide">
+          <span>Career page or feed URL</span>
+          <input name="url" type="url" value="{_esc(test_url)}" placeholder="https://example.org/jobs or https://example.org/feed.xml" required>
+        </label>
+        <button class="jr-button" type="submit">Test URL</button>
+      </form>
+      {result_html}
+    </section>
+    """
+    return _page("Source Builder", body)
+
+
+def _source_builder_result(url: str, organization: str | None) -> str:
+    from job_radar.ingestion.runner import SCRAPERS
+
+    detection = detect_source(url)
+    scraper_cls = SCRAPERS.get(detection.platform)
+    reliability = _platform_reliability(detection.platform, detection.parser_type)
+    manual = detection.manual_review_needed or scraper_cls is None
+
+    sample_rows = ""
+    warning = ""
+    jobs_found = 0
+    suggested_action = "Save as active source"
+
+    if not manual and scraper_cls is not None:
+        try:
+            scraper = scraper_cls()
+            jobs = scraper.fetch(organization=organization, **detection.config)
+            jobs_found = len(jobs)
+            if jobs:
+                for job in jobs[:5]:
+                    sample_rows += f"""
+                    <tr>
+                      <td>{_esc(job.title)}</td>
+                      <td>{_esc(job.organization or organization or "")}</td>
+                      <td>{_esc(job.location or "")}</td>
+                      <td><a class="jr-link" href="{_esc(job.source_url)}" target="_blank" rel="noreferrer">Open</a></td>
+                    </tr>
+                    """
+            else:
+                warning = "Extraction succeeded but returned 0 jobs. The page may be empty or require filters."
+                suggested_action = "Save as active source — check again after next scan"
+        except Exception as exc:
+            warning = f"Extraction failed: {exc}"
+            manual = True
+            suggested_action = "Save as manual-watch — automation could not extract jobs"
+    else:
+        suggested_action = "Save as manual-watch — no automated connector available"
+        if detection.note:
+            warning = detection.note
+
+    sample_table = f"""
+    <div class="jr-table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Organization</th><th>Location</th><th>Link</th></tr></thead>
+        <tbody>{sample_rows or _empty_row("No jobs extracted.", 4)}</tbody>
+      </table>
+    </div>
+    """ if not manual else ""
+
+    warning_html = f'<p class="jr-help" style="color:#b45309">{_esc(warning)}</p>' if warning else ""
+
+    return f"""
+    <section class="jr-band">
+      <div class="jr-band-heading">
+        <h2>Test Result</h2>
+        <span class="pill {'green' if not manual else 'amber'}">{_esc(reliability)}</span>
+      </div>
+      <dl class="jr-metadata">
+        <dt>URL</dt><dd>{_esc(url)}</dd>
+        <dt>Platform</dt><dd>{_esc(detection.platform)}</dd>
+        <dt>Connector</dt><dd>{_esc(detection.parser_type)}</dd>
+        <dt>Jobs found</dt><dd>{jobs_found}</dd>
+        <dt>Suggested action</dt><dd>{_esc(suggested_action)}</dd>
+      </dl>
+      {warning_html}
+      {sample_table}
+      <div class="jr-actions" style="margin-top:1rem">
+        <form method="post" action="/source-builder/save">
+          <input type="hidden" name="url" value="{_esc(url)}">
+          <input type="hidden" name="organization" value="{_esc(organization or "")}">
+          <input type="hidden" name="manual" value="0">
+          <button class="jr-button" type="submit">Save as Active Source</button>
+        </form>
+        <form method="post" action="/source-builder/save">
+          <input type="hidden" name="url" value="{_esc(url)}">
+          <input type="hidden" name="organization" value="{_esc(organization or "")}">
+          <input type="hidden" name="manual" value="1">
+          <button class="jr-button secondary" type="submit">Save as Manual Watch</button>
+        </form>
+      </div>
+    </section>
+    """
 
 
 def render_source_packs() -> str:
@@ -778,7 +922,8 @@ def _source_health_rows() -> list[dict]:
         """
         SELECT s.id, s.url, s.organization, s.platform, s.parser_type, s.status,
                h.last_checked_at, h.last_successful_at, h.jobs_found, h.new_jobs_found,
-               h.error_status, h.manual_review_needed, h.likely_broken_url
+               h.error_status, h.manual_review_needed, h.likely_broken_url,
+               h.confidence_label, h.confidence_score, h.confidence_note
         FROM sources s
         LEFT JOIN source_health h ON h.source_id = s.id
         ORDER BY
@@ -923,6 +1068,116 @@ def _source_preview_rows(urls: list[str], organization: str) -> str:
     """
 
 
+def _radar_section() -> str:
+    """Today's Radar — new, reappeared, changed, and source issues at a glance."""
+    new_jobs = execute(
+        """
+        SELECT j.id, j.title, j.organization, j.location, j.source_url,
+               j.first_seen_at, js.score
+        FROM jobs j
+        LEFT JOIN job_scores js ON js.job_id = j.id
+        WHERE j.lifecycle_status = 'new'
+        ORDER BY j.first_seen_at DESC
+        LIMIT 8
+        """
+    )
+    reappeared_jobs = execute(
+        """
+        SELECT j.id, j.title, j.organization, j.last_seen_at, js.score
+        FROM jobs j
+        LEFT JOIN job_scores js ON js.job_id = j.id
+        WHERE j.lifecycle_status = 'reappeared'
+        ORDER BY j.last_seen_at DESC
+        LIMIT 5
+        """
+    )
+    changed_jobs = execute(
+        """
+        SELECT j.id, j.title, j.organization, j.last_changed_at
+        FROM jobs j
+        WHERE j.lifecycle_status = 'changed'
+        ORDER BY j.last_changed_at DESC
+        LIMIT 5
+        """
+    )
+    problem_sources = execute(
+        """
+        SELECT s.organization, s.url, h.confidence_label, h.confidence_score, h.confidence_note
+        FROM sources s
+        JOIN source_health h ON h.source_id = s.id
+        WHERE h.confidence_label IN ('broken', 'degrading', 'watch')
+        ORDER BY h.confidence_score ASC
+        LIMIT 5
+        """
+    )
+
+    if not new_jobs and not reappeared_jobs and not changed_jobs and not problem_sources:
+        return ""
+
+    new_items = "".join(
+        f"""<li>
+          <a class="jr-link" href="/job?job_id={_esc(j['id'])}">{_esc(j['title'])}</a>
+          <span class="muted"> — {_esc(j['organization'] or '')}</span>
+          {'<span class="pill green">' + str(int(j["score"])) + '</span>' if j.get("score") else ''}
+        </li>"""
+        for j in new_jobs
+    ) or "<li class='muted'>None since last scan.</li>"
+
+    reappeared_items = "".join(
+        f"""<li>
+          <span class="pill teal">back</span>
+          <a class="jr-link" href="/job?job_id={_esc(j['id'])}">{_esc(j['title'])}</a>
+          <span class="muted"> — {_esc(j['organization'] or '')}</span>
+          {'<span class="pill green">' + str(int(j["score"])) + '</span>' if j.get("score") else ''}
+        </li>"""
+        for j in reappeared_jobs
+    ) or "<li class='muted'>None.</li>"
+
+    changed_items = "".join(
+        f"""<li>
+          <a class="jr-link" href="/job?job_id={_esc(j['id'])}">{_esc(j['title'])}</a>
+          <span class="muted"> — {_esc(j['organization'] or '')}</span>
+        </li>"""
+        for j in changed_jobs
+    ) or "<li class='muted'>None.</li>"
+
+    source_items = "".join(
+        f"""<li>
+          <span class="pill {'red' if s['confidence_label'] == 'broken' else 'orange' if s['confidence_label'] == 'degrading' else 'amber'}"
+                title="{_esc(s['confidence_note'] or '')}">{s.get('confidence_score') or 0}</span>
+          <strong>{_esc(s['organization'] or s['url'])}</strong>
+        </li>"""
+        for s in problem_sources
+    ) or "<li class='muted'>All sources healthy.</li>"
+
+    return f"""
+    <section class="jr-band" id="radar">
+      <div class="jr-band-heading">
+        <h2>Today&#8217;s Radar</h2>
+        <a class="jr-small-link" href="/source-health">Source Health Center</a>
+      </div>
+      <div class="jr-radar-grid">
+        <div class="jr-radar-col">
+          <h3>New ({len(new_jobs)})</h3>
+          <ul class="jr-radar-list">{new_items}</ul>
+        </div>
+        <div class="jr-radar-col">
+          <h3>Reappeared ({len(reappeared_jobs)})</h3>
+          <ul class="jr-radar-list">{reappeared_items}</ul>
+        </div>
+        <div class="jr-radar-col">
+          <h3>Changed ({len(changed_jobs)})</h3>
+          <ul class="jr-radar-list">{changed_items}</ul>
+        </div>
+        <div class="jr-radar-col">
+          <h3>Sources ({len(problem_sources)} need attention)</h3>
+          <ul class="jr-radar-list">{source_items}</ul>
+        </div>
+      </div>
+    </section>
+    """
+
+
 def _scan_report_from_result(result) -> dict:
     return {
         "run_id": result.run_id,
@@ -931,6 +1186,7 @@ def _scan_report_from_result(result) -> dict:
         "sources_failed": result.sources_failed,
         "jobs_found": result.jobs_found,
         "new_jobs_found": result.new_jobs_found,
+        "jobs_changed": sum(getattr(r, "jobs_changed", 0) for r in result.results),
         "failed_sources": [
             {"url": item.url, "platform": item.platform, "error": item.error}
             for item in result.results
@@ -957,8 +1213,9 @@ def _scan_report_card(report: dict | None) -> str:
       <div class="jr-report-grid">
         <span><strong>{report.get("sources_attempted", 0)}</strong> sources checked</span>
         <span><strong>{report.get("jobs_found", 0)}</strong> jobs found</span>
-        <span><strong>{report.get("new_jobs_found", 0)}</strong> new jobs</span>
-        <span><strong>{report.get("sources_succeeded", 0)}</strong> sources succeeded</span>
+        <span><strong>{report.get("new_jobs_found", 0)}</strong> new</span>
+        <span><strong>{report.get("jobs_changed", 0)}</strong> changed</span>
+        <span><strong>{report.get("sources_succeeded", 0)}</strong> sources ok</span>
       </div>
       {f'<ul class="jr-report-errors">{failed_rows}</ul>' if failed_rows else ''}
     </section>
@@ -1033,6 +1290,14 @@ def _score_class(row: dict) -> str:
     return "neutral"
 
 
+def _lifecycle_pill(status: str) -> str:
+    classes = {
+        "new": "green", "active": "neutral", "changed": "green",
+        "reappeared": "green", "probably_closed": "amber", "dead": "amber",
+    }
+    return f'<span class="pill {classes.get(status, "neutral")}">{_esc(status)}</span>'
+
+
 def _source_status_label(row: dict) -> str:
     if row.get("source_broken"):
         return "source likely broken"
@@ -1044,23 +1309,23 @@ def _source_status_label(row: dict) -> str:
 
 
 def _job_row(row: dict) -> str:
-    live = "Live" if row["is_live"] else "Stale"
     score = "Unscored" if row["score"] is None else f"{row['score']:.1f}"
     score_class = _score_class(row)
     reason = row["exclusion_reason"] or ""
     explanation = _explanation_preview(row.get("explanation_json"))
     seen = _esc(row["first_seen_at"] or "")
+    lifecycle = row.get("lifecycle_status") or "active"
+    lifecycle_pill = _lifecycle_pill(lifecycle)
     return f"""
     <tr>
       <td><strong>{html.escape(row["title"] or "")}</strong>{f'<br><span class="muted">{html.escape(reason)}</span>' if reason else ''}</td>
       <td>{html.escape(row["organization"] or "")}</td>
       <td>{html.escape(row["location"] or "")}</td>
-      <td><span class="pill neutral">{html.escape(row["user_status"] or "new")}</span></td>
+      <td>{lifecycle_pill}<br><span class="pill neutral">{html.escape(row["user_status"] or "new")}</span></td>
       <td><span class="pill {score_class}">{score}</span></td>
       <td class="muted">{explanation}</td>
       <td class="muted">{seen}</td>
       <td>{_esc(row["platform"] or "")}</td>
-      <td><span class="pill {'green' if row["is_live"] else 'amber'}">{live}</span></td>
       <td><a class="jr-link" href="{html.escape(row["source_url"] or "#")}" target="_blank" rel="noreferrer">Open</a></td>
       <td class="actions-cell">
         <a class="jr-small-link" href="/job?job_id={_esc(row["id"])}">Details</a>
@@ -1071,8 +1336,15 @@ def _job_row(row: dict) -> str:
 
 
 def _source_row(row: dict, health_center: bool = False) -> str:
-    status_class = "green" if row["status"] == "active" and not row["error_status"] and not row["likely_broken_url"] else "amber"
-    error = row["error_status"] or ""
+    confidence = row.get("confidence_label") or "unknown"
+    score = row.get("confidence_score")
+    note = row.get("confidence_note") or ""
+    conf_class = {
+        "healthy": "green", "watch": "amber", "degrading": "orange", "broken": "red",
+    }.get(confidence, "neutral")
+    score_str = f"{score} " if score is not None else ""
+    conf_pill = f'<span class="pill {conf_class}" title="{html.escape(note)}">{score_str}{html.escape(confidence)}</span>'
+    error = row.get("error_status") or ""
     if len(error) > 96:
         error = error[:93] + "..."
     label = row["organization"] or row["url"]
@@ -1082,11 +1354,11 @@ def _source_row(row: dict, health_center: bool = False) -> str:
       <td><strong>{html.escape(label or "")}</strong><br><a class="jr-link muted" href="{html.escape(row["url"] or "#")}" target="_blank" rel="noreferrer">{html.escape(row["url"] or "")}</a></td>
       <td>{html.escape(row["platform"] or "")}</td>
       <td>{html.escape(row["parser_type"] or "")}</td>
-      <td><span class="pill {status_class}">{html.escape(row["status"] or "")}</span></td>
-      <td>{html.escape(row["last_checked_at"] or "Not checked")}</td>
+      <td>{conf_pill}</td>
+      <td>{html.escape(row.get("last_checked_at") or "Not checked")}</td>
       {last_success}
-      <td>{row["jobs_found"] or 0}</td>
-      <td>{row["new_jobs_found"] or 0}</td>
+      <td>{row.get("jobs_found") or 0}</td>
+      <td>{row.get("new_jobs_found") or 0}</td>
       <td class="error-cell">{html.escape(error)}</td>
       <td class="actions-cell">{_source_actions(row)}</td>
     </tr>

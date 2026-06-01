@@ -1,0 +1,93 @@
+id: us_foundations
+name: US Foundations & Think Tanks
+description: US-based foundations, think tanks, and policy research organisations with public career pages.
+sources:
+  - organization: Carnegie Endowment for International Peace
+    url: https://carnegieendowment.org/about/careers
+    platform_hint: generic_static
+    tags: [international_affairs, policy, research, think_tank]
+    region: Washington DC
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: International affairs think tank.
+
+  - organization: Brookings Institution
+    url: https://www.brookings.edu/careers/
+    platform_hint: generic_static
+    tags: [policy, research, economics, think_tank]
+    region: Washington DC
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Major US policy research institution.
+
+  - organization: Council on Foreign Relations
+    url: https://www.cfr.org/careers
+    platform_hint: generic_static
+    tags: [international_affairs, foreign_policy, research]
+    region: New York
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Foreign policy research and publishing.
+
+  - organization: RAND Corporation
+    url: https://www.rand.org/jobs.html
+    platform_hint: generic_static
+    tags: [policy, research, defence, think_tank]
+    region: US
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Policy research across defence, health, and social policy.
+
+  - organization: Atlantic Council
+    url: https://www.atlanticcouncil.org/jobs/
+    platform_hint: generic_static
+    tags: [international_affairs, security, policy, think_tank]
+    region: Washington DC
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Transatlantic policy and security.
+
+  - organization: Pew Research Center
+    url: https://www.pewresearch.org/about/careers/
+    platform_hint: generic_static
+    tags: [research, social_science, data]
+    region: Washington DC
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Public opinion and social research.
+
+  - organization: Aspen Institute
+    url: https://www.aspeninstitute.org/jobs/
+    platform_hint: generic_static
+    tags: [policy, leadership, education, think_tank]
+    region: Washington DC
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Policy dialogue and leadership programmes.
+
+  - organization: Open Society Foundations
+    url: https://www.opensocietyfoundations.org/jobs
+    platform_hint: generic_static
+    tags: [policy, human_rights, foundation, international_affairs]
+    region: New York
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Democracy and human rights funder.
+
+  - organization: MacArthur Foundation
+    url: https://www.macfound.org/careers/
+    platform_hint: generic_static
+    tags: [foundation, policy, environment, criminal_justice]
+    region: Chicago
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: US foundation across climate, justice, and democracy.
+
+  - organization: Rockefeller Foundation
+    url: https://www.rockefellerfoundation.org/about-us/careers/
+    platform_hint: generic_static
+    tags: [foundation, climate, health, development]
+    region: New York
+    last_verified: "2026-06-01"
+    confidence: medium
+    notes: Global development and climate funder.
