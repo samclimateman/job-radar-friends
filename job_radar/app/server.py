@@ -213,6 +213,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._redirect("/#ranked")
             return
 
+        if self.path == "/sources/notes":
+            source_id = _first(form, "source_id")
+            notes = _first(form, "notes") or ""
+            if source_id:
+                update_source_notes(source_id, notes)
+            self._redirect("/source-health")
+            return
+
         if self.path == "/api/save":
             save_api_env({
                 "LLM_PROVIDER": _first(form, "llm_provider") or "",
@@ -916,7 +924,9 @@ def _dashboard_jobs(view: str) -> list[dict]:
         f"""
         SELECT j.id, j.title, j.organization, j.location, j.remote_status, j.deadline,
                j.source_url, j.user_status, j.is_live, j.is_excluded, j.exclusion_reason,
-               j.first_seen_at, j.last_seen_at, s.platform, h.error_status AS source_error,
+               j.first_seen_at, j.last_seen_at, j.lifecycle_status,
+               s.platform, s.notes AS source_notes,
+               h.error_status AS source_error,
                h.manual_review_needed AS source_manual_review, h.likely_broken_url AS source_broken,
                js.score, js.explanation_json
         FROM jobs j
@@ -1415,11 +1425,19 @@ def _source_actions(row: dict) -> str:
           <button class="jr-small-button danger" type="submit">Disable</button>
         </form>
         """
-    return retry + manual + edit + toggle
+    notes_val = html.escape(row.get("notes") or "")
+    notes_form = f"""
+    <form method="post" action="/sources/notes" class="source-notes-form">
+      <input type="hidden" name="source_id" value="{html.escape(row['id'])}">
+      <input name="notes" type="text" value="{notes_val}" placeholder="Org notes (e.g. contact, hiring freeze, priority)">
+      <button class="jr-small-button secondary" type="submit">Save note</button>
+    </form>
+    """
+    return retry + manual + edit + notes_form + toggle
 
 
 def _job_status_actions(job_id: str) -> str:
-    return "".join(
+    status_buttons = "".join(
         f"""
         <form method="post" action="/jobs/status">
           <input type="hidden" name="job_id" value="{_esc(job_id)}">
@@ -1435,6 +1453,7 @@ def _job_status_actions(job_id: str) -> str:
             ("archived", "Archive", ""),
         ]
     )
+    return status_buttons
 
 
 def _explanation_preview(payload: str | None) -> str:
@@ -1488,6 +1507,14 @@ def update_job_status(job_id: str, status: str) -> None:
             updated_at = CURRENT_TIMESTAMP
         """,
         (job_id, status),
+    )
+
+
+
+def update_source_notes(source_id: str, notes: str) -> None:
+    execute(
+        "UPDATE sources SET notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (notes.strip() or None, source_id),
     )
 
 

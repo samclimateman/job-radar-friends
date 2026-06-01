@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS jobs (
     is_excluded INTEGER NOT NULL DEFAULT 0,
     exclusion_reason TEXT,
     user_status TEXT NOT NULL DEFAULT 'new',
-    snooze_until TEXT,
     UNIQUE(source_id, source_url)
 );
 
