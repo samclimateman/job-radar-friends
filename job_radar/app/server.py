@@ -63,6 +63,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/export/jobs.csv":
             self._send_download("jobs.csv", "text/csv; charset=utf-8", export_jobs_csv())
             return
+        if parsed.path == "/export/notes.json":
+            from job_radar.notes.store import export_notes_json
+            self._send_download("notes.json", "application/json; charset=utf-8",
+                                export_notes_json().encode())
+            return
+        if parsed.path == "/export/notes.csv":
+            from job_radar.notes.store import export_notes_csv
+            self._send_download("notes.csv", "text/csv; charset=utf-8",
+                                export_notes_csv().encode())
+            return
         if parsed.path == "/export/sources.json":
             self._send_download(
                 "sources.json",
@@ -71,10 +81,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
             )
             return
         if parsed.path == "/backup/database":
+            import zipfile as _zf
+            from job_radar.notes.store import (
+                export_notes_csv, export_notes_json, export_notes_markdown,
+            )
             db_path = get_settings().db_path
             init_db()
             execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            self._send_download("job-radar.sqlite", "application/octet-stream", db_path.read_bytes())
+            buf = io.BytesIO()
+            with _zf.ZipFile(buf, "w", _zf.ZIP_DEFLATED) as zf:
+                zf.writestr("job-radar.sqlite", db_path.read_bytes())
+                zf.writestr("notes.json", export_notes_json())
+                zf.writestr("notes.csv", export_notes_csv())
+                for path, content in export_notes_markdown().items():
+                    zf.writestr(path, content)
+            self._send_download("job-radar-backup.zip", "application/zip", buf.getvalue())
             return
         if parsed.path == "/wizard":
             self._send_html(render_wizard())

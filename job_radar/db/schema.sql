@@ -134,6 +134,21 @@ CREATE TABLE IF NOT EXISTS app_state (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    body_markdown TEXT NOT NULL DEFAULT '',
+    note_type TEXT NOT NULL DEFAULT 'general',
+    linked_entity_type TEXT,
+    linked_entity_id TEXT,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    pinned INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
+);
+
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_jobs_source_id ON jobs(source_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_lifecycle_status ON jobs(lifecycle_status);
@@ -146,3 +161,8 @@ CREATE INDEX IF NOT EXISTS idx_source_runs_run_id ON source_runs(run_id);
 CREATE INDEX IF NOT EXISTS idx_source_runs_source_id ON source_runs(source_id);
 CREATE INDEX IF NOT EXISTS idx_observations_job_id ON job_observations(job_id);
 CREATE INDEX IF NOT EXISTS idx_observations_run_id ON job_observations(run_id);
+CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
+CREATE INDEX IF NOT EXISTS idx_notes_linked_entity ON notes(linked_entity_type, linked_entity_id);
+CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notes_archived ON notes(archived);
+CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
