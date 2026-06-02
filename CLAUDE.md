@@ -54,14 +54,18 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Source health view in dashboard
 - Confidence scoring + lifecycle tracking (discovered → reviewing → applied etc.)
 - macOS DMG build with ad-hoc signing
+- **Job search** — text input below view tabs, filters by title/org/location via `?q=` param; limit raised 25→200
+- **Compact "why matched" column** — shows top 3 matched values (e.g. `Brussels · policy · climate`), excluded jobs get red pill, concerns shown as muted `(1 concern)` note
 
-### What's next (from ROADMAP_2_0.md)
-1. **Onboarding wizard** — choose ecosystem, add sources, define strategy, generate rubric, first scan
-2. **Curated ecosystem packs** — Brussels Policy, DC Think Tank, Climate & Energy etc. (preloaded source lists with tags + last-verified dates)
-3. **Source Health Center** — per-source status, parser type, last checked, failures visible
-4. **Polished dashboard** — ranked cards, new-since-last-scan, closing soon, calm card UI
-5. **Lightweight application workflow** — shortlist → reviewing → applied → interviewing → rejected
-6. **Import/export** — CSV export, backup/restore, source pack sharing
+### What's next (prioritised plan)
+1. **Split `server.py`** (1927 lines) into `handlers/` — routing only in server.py; unblocks all future work
+2. **Source packs UI** — browser page + import button (YAMLs + loader.py already exist, just need UI wiring)
+3. **Wire source packs into onboarding wizard** step
+4. **Scan report** shown after refresh — N sources, N new, N failed
+5. **Source Health Center** — zero-jobs vs error distinction, per-source actions
+6. **Score verbal labels** — strong / good / possible / weak
+7. **Rubric editor with preview-score** input
+8. Tests: description visibility regression, notes/status survive rescan, zero-vs-error source distinction
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
