@@ -139,6 +139,32 @@ h1 {
   color: #fff;
 }
 
+.jr-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.jr-search-input {
+  flex: 1;
+  max-width: 340px;
+  min-width: 180px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+
+.jr-search-input:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 2px rgba(41, 79, 127, 0.12);
+}
+
 .jr-meta {
   display: flex;
   flex-wrap: wrap;

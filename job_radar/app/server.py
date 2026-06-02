@@ -122,7 +122,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_html(render_note_detail(_first(params, "note_id") or ""))
             return
         params = parse_qs(parsed.query)
-        self._send_html(render_dashboard(view=_first(params, "view") or "best"))
+        self._send_html(render_dashboard(view=_first(params, "view") or "best", q=_first(params, "q") or ""))
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -363,6 +363,7 @@ def render_dashboard(
     preview_urls: list[str] | None = None,
     preview_org: str = "",
     view: str = "best",
+    q: str = "",
 ) -> str:
     stats = _stats()
     rubric = active_rubric_values()
@@ -374,7 +375,7 @@ def render_dashboard(
     setup_steps = _setup_steps(stats, rubric)
     strategy_summary = _strategy_summary(rubric)
     scan_report = _scan_report_card(last_scan_report)
-    jobs = _dashboard_jobs(view)
+    jobs = _dashboard_jobs(view, q=q)
     sources = execute(
         """
         SELECT s.id, s.url, s.organization, s.platform, s.parser_type, s.status,
@@ -546,7 +547,7 @@ def render_dashboard(
         <button class="jr-small-button danger" type="submit">Restore DB</button>
       </form>
       <div class="jr-table-wrap">
-        {_saved_views(view)}
+        {_saved_views(view, q=q)}
         {_job_cards(jobs[:6])}
         <table>
           <thead>
@@ -1156,7 +1157,7 @@ _ACTIVE = (
 )
 
 
-def _dashboard_jobs(view: str) -> list[dict]:
+def _dashboard_jobs(view: str, q: str = "") -> list[dict]:
     order = "ORDER BY COALESCE(js.score, -1) DESC, j.first_seen_at DESC"
     if view == "new":
         where = f"WHERE {_ACTIVE}"
@@ -1183,6 +1184,12 @@ def _dashboard_jobs(view: str) -> list[dict]:
     else:
         where = f"WHERE {_ACTIVE}"
 
+    params: tuple = ()
+    if q:
+        like = f"%{q}%"
+        where += " AND (j.title LIKE ? OR j.organization LIKE ? OR j.location LIKE ?)"
+        params = (like, like, like)
+
     return execute(
         f"""
         SELECT j.id, j.title, j.organization, j.location, j.remote_status, j.deadline,
@@ -1198,8 +1205,9 @@ def _dashboard_jobs(view: str) -> list[dict]:
         LEFT JOIN source_health h ON h.source_id = j.source_id
         {where}
         {order}
-        LIMIT 25
-        """
+        LIMIT 200
+        """,
+        params,
     )
 
 
@@ -1518,7 +1526,7 @@ def _platform_reliability(platform: str, parser_type: str) -> str:
     return "Manual watch"
 
 
-def _saved_views(active: str) -> str:
+def _saved_views(active: str, q: str = "") -> str:
     views = [
         ("best", "Best Matches"),
         ("new", "New"),
@@ -1529,11 +1537,18 @@ def _saved_views(active: str) -> str:
         ("organization", "By Organization"),
         ("location", "By Location"),
     ]
+    q_param = f"&q={_esc(q)}" if q else ""
     links = "".join(
-        f'<a class="{"active" if key == active else ""}" href="/?view={_esc(key)}#ranked">{_esc(label)}</a>'
+        f'<a class="{"active" if key == active else ""}" href="/?view={_esc(key)}{q_param}#ranked">{_esc(label)}</a>'
         for key, label in views
     )
-    return f'<nav class="jr-view-tabs" aria-label="Saved job views">{links}</nav>'
+    clear_link = f' <a class="jr-small-link" href="/?view={_esc(active)}#ranked">Clear</a>' if q else ""
+    search_form = f"""<form class="jr-search-form" method="get" action="/" onsubmit="this.action='/#ranked'">
+      <input type="hidden" name="view" value="{_esc(active)}">
+      <input class="jr-search-input" type="search" name="q" value="{_esc(q)}" placeholder="Search jobs…" aria-label="Search jobs">
+      <button class="jr-small-button" type="submit">Search</button>{clear_link}
+    </form>"""
+    return f'<nav class="jr-view-tabs" aria-label="Saved job views">{links}</nav>{search_form}'
 
 
 def _job_cards(rows: list[dict]) -> str:
@@ -1721,13 +1736,24 @@ def _job_status_actions(job_id: str) -> str:
 
 def _explanation_preview(payload: str | None) -> str:
     if not payload:
-        return "No score explanation yet"
+        return '<span class="muted">No score yet</span>'
     try:
         data = json.loads(payload)
     except json.JSONDecodeError:
-        return "Score explanation unavailable"
-    parts = (data.get("excluded") or []) + (data.get("matched") or []) + (data.get("downgraded") or [])
-    return _esc("; ".join(parts[:2]) or "No matched rules")
+        return '<span class="muted">—</span>'
+    excluded = data.get("excluded") or []
+    if excluded:
+        reason = excluded[0].removeprefix("excluded because: ")
+        return f'<span class="pill red" title="{_esc(excluded[0])}">Excluded: {_esc(reason[:40])}</span>'
+    matched = data.get("matched") or []
+    downgraded = data.get("downgraded") or []
+    # Extract just the value from "matched location: Brussels" → "Brussels"
+    def _val(s: str) -> str:
+        return s.split(": ", 1)[-1] if ": " in s else s
+    top = [_val(m) for m in matched[:3]]
+    parts = " · ".join(top) if top else "—"
+    note = f' <span class="muted">({len(downgraded)} concern{"s" if len(downgraded) != 1 else ""})</span>' if downgraded else ""
+    return f'<span class="muted">{_esc(parts)}</span>{note}'
 
 
 def _explanation_bits(payload: str | None, key: str, limit: int) -> list[str]:
