@@ -36,8 +36,8 @@ def init_db(path: Path | None = None) -> Path:
     db_path = path or get_settings().db_path
     schema = files("job_radar.db").joinpath("schema.sql").read_text()
     with connect(db_path) as conn:
+        _ensure_columns(conn)   # add missing columns before schema runs indexes on them
         conn.executescript(schema)
-        _ensure_columns(conn)
         _backfill_source_config(conn)
     return db_path
 
