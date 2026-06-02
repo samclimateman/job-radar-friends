@@ -82,11 +82,12 @@ def test_wizard_and_source_pack_import(tmp_path, monkeypatch):
 
     wizard = render_wizard()
     packs = render_source_packs()
-    imported = import_source_pack("brussels_policy", {"https://www.bruegel.org/careers"})
+    count, pack_name = import_source_pack("brussels_policy", {"https://www.bruegel.org/careers"})
 
     assert "Onboarding Wizard" in wizard
     assert "Brussels Policy Starter Pack" in packs
-    assert imported == 1
+    assert count == 1
+    assert "Brussels" in pack_name
     sources = execute("SELECT organization, url FROM sources")
     assert sources[0]["organization"] == "Bruegel"
     assert sources[0]["url"] == "https://www.bruegel.org/careers"

@@ -7,17 +7,30 @@ from job_radar.scoring.store import active_rubric_values
 from job_radar.source_packs.loader import list_source_packs
 
 
-def render_wizard() -> str:
+def render_wizard(imported: int = 0, pack_name: str = "") -> str:
     stats = _stats()
     rubric = active_rubric_values()
     packs = list_source_packs()
+
+    flash = ""
+    if imported > 0:
+        label = _esc(pack_name) if pack_name else "the pack"
+        flash = f'<p class="jr-flash jr-flash-ok">Added {imported} source{"s" if imported != 1 else ""} from {label}.</p>'
+
     pack_cards = "".join(
         f"""
         <article class="jr-pack-card">
           <h3>{_esc(pack.name)}</h3>
           <p>{_esc(pack.description)}</p>
-          <p class="muted">{len(pack.entries)} sources</p>
-          <a class="jr-small-link" href="/source-packs#{_esc(pack.id)}">Review Pack</a>
+          <p class="muted">{len(pack.entries)} sources · {_esc(pack.entries[0].region if pack.entries else "")}</p>
+          <div class="jr-pack-actions">
+            <a class="jr-small-link" href="/source-packs#{_esc(pack.id)}">Review &amp; select</a>
+            <form method="post" action="/source-packs/import" style="display:inline">
+              <input type="hidden" name="pack_id" value="{_esc(pack.id)}">
+              <input type="hidden" name="redirect_to" value="wizard">
+              <button class="jr-small-button" type="submit">Import all</button>
+            </form>
+          </div>
         </article>
         """
         for pack in packs
@@ -28,6 +41,7 @@ def render_wizard() -> str:
         <h2>Onboarding Wizard</h2>
         <a class="jr-small-link" href="/">Back to Dashboard</a>
       </div>
+      {flash}
       <div class="jr-steps">
         {_wizard_step("Choose sources", stats["sources"] > 0, f"{stats['sources']} saved")}
         {_wizard_step("Define strategy", bool(rubric), "rubric saved" if rubric else "needed")}

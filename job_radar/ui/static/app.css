@@ -403,6 +403,28 @@ textarea { resize: vertical; }
   font-weight: 700;
 }
 
+.jr-pack-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.jr-flash {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.jr-flash-ok {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid #b7e7c8;
+}
+
 .jr-report-grid {
   align-items: stretch;
 }

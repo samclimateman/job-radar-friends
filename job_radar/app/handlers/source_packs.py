@@ -53,10 +53,11 @@ def render_source_packs() -> str:
     return _page("Source Packs", "".join(sections) or '<p class="jr-help">No source packs bundled yet.</p>')
 
 
-def import_source_pack(pack_id: str, selected_urls: set[str] | None = None) -> int:
+def import_source_pack(pack_id: str, selected_urls: set[str] | None = None) -> tuple[int, str]:
+    """Returns (count_imported, pack_name)."""
     pack = get_source_pack(pack_id)
     if not pack:
-        return 0
+        return 0, ""
     selected = selected_urls or {entry.url for entry in pack.entries}
     count = 0
     for entry in pack.entries:
@@ -64,4 +65,4 @@ def import_source_pack(pack_id: str, selected_urls: set[str] | None = None) -> i
             continue
         add_source(entry.url, organization=entry.organization)
         count += 1
-    return count
+    return count, pack.name

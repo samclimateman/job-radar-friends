@@ -116,7 +116,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_download("job-radar-backup.zip", "application/zip", buf.getvalue())
             return
         if parsed.path == "/wizard":
-            self._send_html(render_wizard())
+            params = parse_qs(parsed.query)
+            imported = int(_first(params, "imported") or 0)
+            pack_name = _first(params, "pack") or ""
+            self._send_html(render_wizard(imported=imported, pack_name=pack_name))
             return
         if parsed.path == "/source-packs":
             self._send_html(render_source_packs())
@@ -254,9 +257,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path == "/source-packs/import":
             pack_id = _first(form, "pack_id")
             selected_urls = set(form.get("source_url", []))
+            redirect_to = _first(form, "redirect_to") or ""
+            count, pack_name = 0, ""
             if pack_id:
-                import_source_pack(pack_id, selected_urls)
-            self._redirect("/#sources")
+                count, pack_name = import_source_pack(pack_id, selected_urls or None)
+            if redirect_to == "wizard":
+                from urllib.parse import quote
+                self._redirect(f"/wizard?imported={count}&pack={quote(pack_name)}")
+            else:
+                self._redirect("/#sources")
             return
 
         if self.path == "/jobs/status":
