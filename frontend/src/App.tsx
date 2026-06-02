@@ -195,6 +195,10 @@ function StatsBar({ stats, tab, onTab, onRefresh, refreshing, onNotebook }: {
               : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
           Notebook
         </button>
+        <a href="http://127.0.0.1:8767" target="_blank" rel="noreferrer"
+          className="px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors">
+          Settings ↗
+        </a>
         <button onClick={onRefresh} disabled={refreshing}
           className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-50 transition-colors">
           {refreshing ? '↻ Refreshing…' : '↻ Refresh Now'}
@@ -1469,6 +1473,18 @@ export default function App() {
         <div className={`flex-1 ${tab === 'notebook' ? 'overflow-hidden flex' : 'overflow-y-auto'}`}>
           {tab === 'jobs' && (
             <>
+              {stats && stats.sources === 0 && (
+                <div className="mx-6 mt-5 rounded-xl border border-sky-200 bg-sky-50 px-5 py-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-sky-900">No sources yet</p>
+                    <p className="text-xs text-sky-700 mt-0.5">Add career pages to start monitoring jobs. Use the Settings page to add sources and set your strategy.</p>
+                  </div>
+                  <a href="http://127.0.0.1:8767/wizard" target="_blank" rel="noreferrer"
+                    className="flex-shrink-0 ml-4 px-4 py-2 rounded-lg bg-sky-600 text-white text-xs font-semibold hover:bg-sky-700 transition-colors">
+                    Get started →
+                  </a>
+                </div>
+              )}
               <RadarPanel radar={radar} selectedId={selectedId} onSelectJob={id => { setSelectedId(id); setTab('jobs') }}
                 onLocationFilter={handleLocationFilter} />
 

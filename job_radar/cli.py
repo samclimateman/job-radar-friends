@@ -78,8 +78,34 @@ def cmd_sources_list(args: argparse.Namespace) -> int:
 
 
 def cmd_start(args: argparse.Namespace) -> int:
+    import threading
+    import webbrowser
+    import uvicorn
+    from job_radar.app.server import serve as serve_html
+
     init_db()
-    serve(port=args.port, open_browser=not args.no_open)
+
+    # Start the HTML admin server (wizard, source builder, strategy) on port+1
+    admin_port = args.port + 1
+    admin_thread = threading.Thread(
+        target=serve_html,
+        kwargs={"port": admin_port, "open_browser": False},
+        daemon=True,
+    )
+    admin_thread.start()
+
+    # Open browser/Tauri webview at the React dashboard
+    if not args.no_open:
+        threading.Timer(0.8, lambda: webbrowser.open(f"http://127.0.0.1:{args.port}")).start()
+
+    # Start FastAPI (blocks until interrupted)
+    uvicorn.run(
+        "job_radar.api.main:app",
+        host="127.0.0.1",
+        port=args.port,
+        log_level="warning",
+        access_log=False,
+    )
     return 0
 
 
