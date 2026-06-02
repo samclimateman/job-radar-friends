@@ -1414,6 +1414,17 @@ const DEFAULT_ONBOARDING: OnboardingAnswers = {
   strategy_summary: '',
 }
 
+function normalizeOnboardingAnswers(answers?: OnboardingAnswers | null): OnboardingAnswers {
+  const merged = { ...DEFAULT_ONBOARDING, ...(answers ?? {}) }
+  return {
+    ...merged,
+    locations: merged.locations ?? [],
+    themes: merged.themes ?? [],
+    role_types_to_avoid: merged.role_types_to_avoid ?? [],
+    sources: merged.sources?.length ? merged.sources : [{ ...DEFAULT_SOURCE }],
+  }
+}
+
 const LOCATION_CHIPS = [
   'Brussels', 'Berlin', 'The Hague', 'Amsterdam', 'London',
   'Geneva', 'Zurich', 'Paris', 'Remote Europe', 'Hybrid Europe',
@@ -1586,7 +1597,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
   onViewSources: () => void
 }) {
   const [step, setStep] = useState(initialState?.last_step ?? 0)
-  const [answers, setAnswers] = useState<OnboardingAnswers>(initialState?.answers ?? DEFAULT_ONBOARDING)
+  const [answers, setAnswers] = useState<OnboardingAnswers>(normalizeOnboardingAnswers(initialState?.answers))
   const [saving, setSaving] = useState(false)
   const [scanStarted, setScanStarted] = useState(false)
   const [sourceResult, setSourceResult] = useState<number | null>(null)
@@ -1942,10 +1953,6 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
               </div>
               {scanStarted && (
                 <div className="flex gap-2">
-                  <button onClick={onDone}
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
-                    Go to dashboard
-                  </button>
                   <button onClick={onViewSources}
                     className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50">
                     View source health

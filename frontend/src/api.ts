@@ -1,8 +1,5 @@
-// In dev: Vite proxies /api → http://127.0.0.1:8766
-// In production (Tauri): call FastAPI directly
-const BASE = import.meta.env.PROD
-  ? 'http://127.0.0.1:8766/api'
-  : '/api'
+// Vite proxies /api in dev; FastAPI serves the built frontend in production.
+const BASE = '/api'
 
 export interface Job {
   id: string
