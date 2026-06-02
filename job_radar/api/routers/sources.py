@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+import json
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
 from job_radar.db.client import execute
+from job_radar.ingestion.runner import run_ingestion
+from job_radar.ingestion.source_detection import detect_source
+from job_radar.ingestion.source_store import mark_manual_checked
 
 router = APIRouter(tags=["sources"])
 
@@ -68,7 +75,7 @@ def get_radar():
 @router.get("/sources/health")
 def get_source_health():
     sources = execute(
-        """SELECT s.id, s.url, s.organization, s.platform, s.parser_type, s.status,
+        """SELECT s.id, s.url, s.organization, s.notes, s.platform, s.parser_type, s.status,
                h.last_checked_at, h.last_successful_at, h.jobs_found, h.new_jobs_found,
                h.error_status, h.manual_review_needed, h.likely_broken_url,
                h.confidence_label, h.confidence_score, h.confidence_note
@@ -90,7 +97,10 @@ def get_source_health():
         {
             "source_id": r["id"],
             "org_name": r["organization"] or r["url"],
+            "url": r["url"],
             "platform": r["platform"] or "",
+            "status": r["status"],
+            "notes": r.get("notes"),
             "success": not bool(r.get("error_status")),
             "jobs_found": r.get("jobs_found") or 0,
             "jobs_new": r.get("new_jobs_found") or 0,
@@ -121,3 +131,113 @@ def get_source_health():
         },
         "results": results,
     }
+
+
+class SourceUpdate(BaseModel):
+    organization: str | None = None
+    url: str
+    notes: str | None = None
+
+
+@router.patch("/sources/{source_id}")
+def update_source(source_id: str, body: SourceUpdate):
+    rows = execute("SELECT status FROM sources WHERE id = ?", (source_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    url = body.url.strip()
+    if not url:
+        raise HTTPException(status_code=422, detail="URL cannot be empty")
+
+    duplicate = execute("SELECT id FROM sources WHERE url = ? AND id != ?", (url, source_id))
+    if duplicate:
+        raise HTTPException(status_code=409, detail="A source with that URL already exists")
+
+    detection = detect_source(url)
+    current_status = rows[0]["status"]
+    next_status = current_status if current_status == "disabled" else (
+        "needs_review" if detection.manual_review_needed else "active"
+    )
+    execute(
+        """
+        UPDATE sources
+        SET url = ?,
+            organization = ?,
+            platform = ?,
+            parser_type = ?,
+            config_json = ?,
+            status = ?,
+            detection_note = ?,
+            notes = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (
+            url,
+            body.organization.strip() if body.organization else None,
+            detection.platform,
+            detection.parser_type,
+            json.dumps(detection.config),
+            next_status,
+            detection.note,
+            body.notes.strip() if body.notes else None,
+            source_id,
+        ),
+    )
+    return {"ok": True}
+
+
+@router.post("/sources/{source_id}/checked")
+def mark_source_checked(source_id: str):
+    if not execute("SELECT id FROM sources WHERE id = ?", (source_id,)):
+        raise HTTPException(status_code=404, detail="Source not found")
+    mark_manual_checked(source_id)
+    execute("UPDATE sources SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (source_id,))
+    return {"ok": True}
+
+
+@router.post("/sources/{source_id}/disable")
+def disable_source(source_id: str):
+    if not execute("SELECT id FROM sources WHERE id = ?", (source_id,)):
+        raise HTTPException(status_code=404, detail="Source not found")
+    execute("UPDATE sources SET status = 'disabled', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (source_id,))
+    return {"ok": True}
+
+
+@router.post("/sources/{source_id}/enable")
+def enable_source(source_id: str):
+    if not execute("SELECT id FROM sources WHERE id = ?", (source_id,)):
+        raise HTTPException(status_code=404, detail="Source not found")
+    execute("UPDATE sources SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (source_id,))
+    return {"ok": True}
+
+
+@router.post("/sources/{source_id}/retry")
+def retry_source(source_id: str):
+    if not execute("SELECT id FROM sources WHERE id = ?", (source_id,)):
+        raise HTTPException(status_code=404, detail="Source not found")
+    result = run_ingestion(source_id=source_id)
+    return {
+        "ok": True,
+        "sources_succeeded": result.sources_succeeded,
+        "sources_failed": result.sources_failed,
+        "jobs_found": result.jobs_found,
+        "new_jobs_found": result.new_jobs_found,
+    }
+
+
+@router.delete("/sources/{source_id}")
+def delete_source(source_id: str):
+    if not execute("SELECT id FROM sources WHERE id = ?", (source_id,)):
+        raise HTTPException(status_code=404, detail="Source not found")
+    job_count = execute("SELECT COUNT(*) AS n FROM jobs WHERE source_id = ?", (source_id,))[0]["n"]
+    if job_count:
+        raise HTTPException(
+            status_code=409,
+            detail="This source has jobs. Disable it instead so saved jobs remain inspectable.",
+        )
+    execute("DELETE FROM job_observations WHERE source_id = ?", (source_id,))
+    execute("DELETE FROM source_runs WHERE source_id = ?", (source_id,))
+    execute("DELETE FROM source_health WHERE source_id = ?", (source_id,))
+    execute("DELETE FROM sources WHERE id = ?", (source_id,))
+    return {"ok": True}

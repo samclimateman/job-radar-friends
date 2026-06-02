@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
-import type { ReactNode } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { api } from './api'
 import type {
   Job, JobDetail, Radar, SourceHealthSummary, Stats, Application, Note,
@@ -764,14 +764,86 @@ function DetailPanel({ jobId, onClose, onStatusChange, onDismiss }: {
 
 // ── Sources view ──────────────────────────────────────────────────────────────
 
+type SourceDraft = {
+  organization: string
+  url: string
+  notes: string
+}
+
 function SourcesView() {
   const [health, setHealth] = useState<SourceHealthSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<SourceDraft>({ organization: '', url: '', notes: '' })
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
-    api.sourceHealth().then(h => { setHealth(h); setLoading(false) }).catch(() => setLoading(false))
+    loadHealth()
   }, [])
+
+  function loadHealth() {
+    api.sourceHealth().then(h => { setHealth(h); setLoading(false) }).catch(() => setLoading(false))
+  }
+
+  function startEdit(row: SourceHealthSummary['results'][number]) {
+    setEditingId(row.source_id)
+    setDraft({
+      organization: row.org_name === row.url ? '' : row.org_name,
+      url: row.url,
+      notes: row.notes ?? '',
+    })
+  }
+
+  function finishAction(message?: string) {
+    loadHealth()
+    if (message) {
+      setNotice(message)
+      setTimeout(() => setNotice(null), 3000)
+    }
+  }
+
+  function saveEdit(sourceId: string) {
+    if (!draft.url.trim()) {
+      setNotice('Source URL cannot be empty.')
+      return
+    }
+    setBusyId(sourceId)
+    api.updateSource(sourceId, {
+      organization: draft.organization.trim() || null,
+      url: draft.url.trim(),
+      notes: draft.notes.trim() || null,
+    })
+      .then(() => {
+        setEditingId(null)
+        finishAction('Source saved.')
+      })
+      .catch(err => setNotice(err.message || 'Could not save source.'))
+      .finally(() => setBusyId(null))
+  }
+
+  function runSourceAction(sourceId: string, action: 'checked' | 'disable' | 'enable' | 'retry' | 'delete') {
+    const labels = {
+      checked: 'Source marked checked.',
+      disable: 'Source disabled.',
+      enable: 'Source enabled.',
+      retry: 'Source retry finished.',
+      delete: 'Source removed.',
+    }
+    const call = {
+      checked: () => api.markSourceChecked(sourceId),
+      disable: () => api.disableSource(sourceId),
+      enable: () => api.enableSource(sourceId),
+      retry: () => api.retrySource(sourceId),
+      delete: () => api.deleteSource(sourceId),
+    }[action]
+    setBusyId(sourceId)
+    call()
+      .then(() => finishAction(labels[action]))
+      .catch(err => setNotice(err.message || 'Source action failed.'))
+      .finally(() => setBusyId(null))
+  }
 
   if (loading) return <div className="flex items-center justify-center py-20 text-sm text-slate-400">Loading…</div>
   if (!health) return <div className="flex items-center justify-center py-20 text-sm text-slate-400">No source health data yet — run a refresh.</div>
@@ -815,26 +887,45 @@ function SourcesView() {
           placeholder="Filter sources…"
           className="w-64 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200 bg-white" />
         {search && <span className="text-xs text-slate-400">{results.length} result{results.length !== 1 ? 's' : ''}</span>}
+        {notice && <span className="ml-auto text-xs text-slate-600 bg-white border border-slate-200 rounded-lg px-3 py-2">{notice}</span>}
       </div>
 
       {issues.length > 0 && (
         <div className="mb-6">
           <h3 className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2">Issues ({issues.length})</h3>
-          <SourceTable rows={issues} confBadge={confBadge} />
+          <SourceTable rows={issues} confBadge={confBadge}
+            editingId={editingId} draft={draft} setDraft={setDraft}
+            busyId={busyId} onEdit={startEdit} onCancel={() => setEditingId(null)}
+            onSave={saveEdit} onAction={runSourceAction} />
         </div>
       )}
 
       <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
         {issues.length > 0 ? `Working (${ok.length})` : `All Sources (${ok.length})`}
       </h3>
-      <SourceTable rows={ok} confBadge={confBadge} />
+      <SourceTable rows={ok} confBadge={confBadge}
+        editingId={editingId} draft={draft} setDraft={setDraft}
+        busyId={busyId} onEdit={startEdit} onCancel={() => setEditingId(null)}
+        onSave={saveEdit} onAction={runSourceAction} />
     </div>
   )
 }
 
-function SourceTable({ rows, confBadge }: {
+function SourceTable({
+  rows, confBadge, editingId, draft, setDraft, busyId,
+  onEdit, onCancel, onSave, onAction,
+}: {
   rows: SourceHealthSummary['results']
   confBadge: (l: string | null) => string
+} & {
+  editingId: string | null
+  draft: SourceDraft
+  setDraft: Dispatch<SetStateAction<SourceDraft>>
+  busyId: string | null
+  onEdit: (row: SourceHealthSummary['results'][number]) => void
+  onCancel: () => void
+  onSave: (sourceId: string) => void
+  onAction: (sourceId: string, action: 'checked' | 'disable' | 'enable' | 'retry' | 'delete') => void
 }) {
   if (rows.length === 0) return <p className="text-sm text-slate-400 py-4">None.</p>
   return (
@@ -842,43 +933,114 @@ function SourceTable({ rows, confBadge }: {
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-slate-100 bg-slate-50">
-            {['Organisation', 'Platform', 'Jobs', 'New', 'Time', 'Confidence', 'Status'].map(h => (
+            {['Organisation', 'Platform', 'Jobs', 'Confidence', 'Status', 'Actions'].map(h => (
               <th key={h} className="px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map(r => (
-            <tr key={r.source_id} className="border-b border-slate-100 hover:bg-slate-50">
-              <td className="px-4 py-2.5">
-                <p className="text-sm font-medium text-slate-800">{r.org_name}</p>
-                <p className="text-xs text-slate-400">{r.source_id}</p>
-              </td>
-              <td className="px-4 py-2.5 text-xs text-slate-500">{r.platform}</td>
-              <td className="px-4 py-2.5 text-sm text-slate-700">{r.jobs_found}</td>
-              <td className="px-4 py-2.5 text-sm">
-                {r.jobs_new > 0 ? <span className="text-emerald-600 font-medium">+{r.jobs_new}</span> : <span className="text-slate-300">—</span>}
-              </td>
-              <td className="px-4 py-2.5 text-xs text-slate-400 tabular-nums">
-                {r.total_ms > 0 ? `${(r.total_ms / 1000).toFixed(1)}s` : '—'}
-              </td>
-              <td className="px-4 py-2.5">
-                {r.confidence_label && r.confidence_label !== 'unknown' && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${confBadge(r.confidence_label)}`}
-                    title={r.confidence_note ?? ''}>
-                    {r.confidence_label} {r.confidence_score != null ? `· ${r.confidence_score}` : ''}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-2.5">
-                {r.success
-                  ? <span className="text-xs text-emerald-600 font-medium">✓</span>
-                  : <span className="text-xs text-red-600" title={r.error ?? ''}>
-                      {r.error ? r.error.slice(0, 50) + (r.error.length > 50 ? '…' : '') : '✗'}
-                    </span>}
-              </td>
-            </tr>
-          ))}
+          {rows.map(r => {
+            const editing = editingId === r.source_id
+            const busy = busyId === r.source_id
+            const disabled = r.status === 'disabled' || r.skipped
+            return (
+              <tr key={r.source_id} className={`border-b border-slate-100 hover:bg-slate-50 ${disabled ? 'bg-slate-50/60' : ''}`}>
+                <td className="px-4 py-2.5 min-w-[280px]">
+                  {editing ? (
+                    <div className="space-y-2">
+                      <input value={draft.organization} onChange={e => setDraft(d => ({ ...d, organization: e.target.value }))}
+                        placeholder="Organization"
+                        className="w-full text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                      <input value={draft.url} onChange={e => setDraft(d => ({ ...d, url: e.target.value }))}
+                        placeholder="Career page URL"
+                        className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                      <input value={draft.notes} onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
+                        placeholder="Notes"
+                        className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium text-slate-800">{r.org_name}</p>
+                      <a href={r.url} target="_blank" rel="noreferrer"
+                        className="text-xs text-sky-600 hover:underline break-all">{r.url}</a>
+                      {r.notes && <p className="text-xs text-slate-400 mt-1">{r.notes}</p>}
+                    </>
+                  )}
+                </td>
+                <td className="px-4 py-2.5 text-xs text-slate-500">
+                  <span className="font-medium">{r.platform}</span>
+                  <p className="text-[10px] text-slate-400 mt-1">{r.status}</p>
+                </td>
+                <td className="px-4 py-2.5 text-sm text-slate-700">
+                  {r.jobs_found}
+                  {r.jobs_new > 0 && <span className="ml-2 text-xs text-emerald-600 font-medium">+{r.jobs_new}</span>}
+                </td>
+                <td className="px-4 py-2.5">
+                  {r.confidence_label && r.confidence_label !== 'unknown' ? (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${confBadge(r.confidence_label)}`}
+                      title={r.confidence_note ?? ''}>
+                      {r.confidence_label} {r.confidence_score != null ? `· ${r.confidence_score}` : ''}
+                    </span>
+                  ) : <span className="text-xs text-slate-300">—</span>}
+                </td>
+                <td className="px-4 py-2.5">
+                  {disabled
+                    ? <span className="text-xs text-slate-500 font-medium">Disabled</span>
+                    : r.success
+                      ? <span className="text-xs text-emerald-600 font-medium">✓ Working</span>
+                      : <span className="text-xs text-red-600" title={r.error ?? ''}>
+                          {r.error ? r.error.slice(0, 50) + (r.error.length > 50 ? '…' : '') : 'Needs attention'}
+                        </span>}
+                </td>
+                <td className="px-4 py-2.5">
+                  {editing ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => onSave(r.source_id)} disabled={busy}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 disabled:opacity-40">
+                        Save
+                      </button>
+                      <button onClick={onCancel}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      <button onClick={() => onEdit(r)}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                        Edit
+                      </button>
+                      <button onClick={() => onAction(r.source_id, 'checked')} disabled={busy}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                        Mark checked
+                      </button>
+                      <button onClick={() => onAction(r.source_id, 'retry')} disabled={busy || disabled}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                        Retry
+                      </button>
+                      {disabled ? (
+                        <button onClick={() => onAction(r.source_id, 'enable')} disabled={busy}
+                          className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
+                          Enable
+                        </button>
+                      ) : (
+                        <button onClick={() => onAction(r.source_id, 'disable')} disabled={busy}
+                          className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                          Disable
+                        </button>
+                      )}
+                      {r.jobs_found === 0 && (
+                        <button onClick={() => onAction(r.source_id, 'delete')} disabled={busy}
+                          className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

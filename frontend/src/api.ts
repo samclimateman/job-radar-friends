@@ -64,7 +64,10 @@ export interface JobDetail extends Job {
 export interface SourceResult {
   source_id: string
   org_name: string
+  url: string
   platform: string
+  status: string
+  notes: string | null
   success: boolean
   jobs_found: number
   jobs_new: number
@@ -77,6 +80,12 @@ export interface SourceResult {
   confidence_label: string | null
   confidence_score: number | null
   confidence_note: string | null
+}
+
+export interface SourceUpdate {
+  organization: string | null
+  url: string
+  notes: string | null
 }
 
 export interface SourceHealthSummary {
@@ -224,6 +233,14 @@ export const api = {
   updateJobNote: (id: string, notes: string) =>
     patch<{ ok: boolean }>(`/jobs/${id}/note`, { notes }),
   sourceHealth: () => get<SourceHealthSummary | null>('/sources/health'),
+  updateSource: (id: string, body: SourceUpdate) =>
+    patch<{ ok: boolean }>(`/sources/${id}`, body),
+  markSourceChecked: (id: string) => post<{ ok: boolean }>(`/sources/${id}/checked`),
+  disableSource: (id: string) => post<{ ok: boolean }>(`/sources/${id}/disable`),
+  enableSource: (id: string) => post<{ ok: boolean }>(`/sources/${id}/enable`),
+  retrySource: (id: string) =>
+    post<{ ok: boolean; sources_succeeded: number; sources_failed: number; jobs_found: number; new_jobs_found: number }>(`/sources/${id}/retry`),
+  deleteSource: (id: string) => del<{ ok: boolean }>(`/sources/${id}`),
   startRefresh: () => post<RefreshStatus>('/refresh/start'),
   refreshStatus: () => get<RefreshStatus>('/refresh/status'),
   getBlocklist: () => get<string[]>('/blocklist'),
