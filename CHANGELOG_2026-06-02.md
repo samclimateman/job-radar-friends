@@ -106,3 +106,38 @@ cd frontend && npm run build
 ## Known Follow-Up
 
 The production frontend currently hardcodes `http://127.0.0.1:8766/api`. That is correct for the packaged Tauri path, but it makes alternate-port smoke testing awkward because a second server still talks to the canonical app API.
+
+---
+
+## Later Update: Source Management And Packaging QA
+
+Added React source-management actions so users can maintain sources after onboarding:
+- Edit organization, URL, and notes from the Sources tab.
+- Mark sources as checked.
+- Retry a source scan.
+- Enable or disable a source.
+- Remove a source only when no jobs are attached.
+
+Fixed desktop packaging:
+- PyInstaller sidecar now bundles `frontend/dist`.
+- PyInstaller includes the onboarding router as a hidden import.
+- Tauri builds an app bundle first; Makefile then copies/signs the sidecar and creates the DMG.
+- Bundle identifier updated to `com.jobradar.desktop`.
+
+Verification:
+
+```bash
+npm run build
+make build-sidecar
+make build-app
+make build-dmg
+codesign --verify --deep --strict --verbose=2 "src-tauri/target/release/bundle/macos/Job Radar.app"
+.venv/bin/pytest
+# 153 passed
+```
+
+Packaged outputs:
+- `src-tauri/target/release/bundle/macos/Job Radar.app`
+- `dist/Job Radar.dmg`
+
+The packaged app served the React onboarding UI from the frozen sidecar during automated smoke testing. A final manual DMG install/open test is still recommended before sharing with friends.

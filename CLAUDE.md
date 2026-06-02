@@ -29,8 +29,9 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 ## Building and packaging
 
 ```bash
-make build        # build DMG
-make test         # run test suite (149 tests, offline)
+make build-app    # build signed .app bundle
+make build-dmg    # build signed .app and local DMG
+make test         # run test suite (153 tests, offline)
 ```
 
 Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-click → Open on first launch.
@@ -47,6 +48,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - **Phase 2 (May 2026):** Notebook UI, CRUD routes, 8 new tests
 - **React/FastAPI migration (June 2026):** React dashboard on FastAPI, HTML admin/settings server on companion port
 - **Universal onboarding v1/v2 (June 2026):** first-run wizard, optional LLM prompt/paste expansion, source review, setup quality banner
+- **Desktop packaging QA (June 2026):** React assets embedded in PyInstaller sidecar, app-only Tauri build, Makefile-owned DMG creation
 
 ### What's working
 - Full ingestion pipeline: fetch → filter → score → upsert → stale detection
@@ -59,23 +61,23 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Setup quality banner after onboarding: source count, verified count, unchecked sources, block filters, scan state
 - Notebook/notes UI with CRUD routes
 - Source health view in dashboard
+- React source management actions: edit source details, mark checked, retry scan, enable/disable, and guarded delete
 - Confidence scoring + lifecycle tracking (discovered → reviewing → applied etc.)
 - macOS DMG build with ad-hoc signing
 - **Job search** — text input below view tabs, filters by title/org/location via `?q=` param; limit raised 25→200
 - **Compact "why matched" column** — shows top 3 matched values (e.g. `Brussels · policy · climate`), excluded jobs get red pill, concerns shown as muted `(1 concern)` note
 - Fresh database initialization bug fixed: migrations no longer run against missing base tables
+- Packaged sidecar includes `frontend/dist` and onboarding router; packaged `.app` serves the React onboarding UI on first launch
 
 ### What's next (prioritised plan)
-1. **Manual QA fresh install onboarding** — run against an isolated data dir on canonical port `8766`, click through all screens, inspect screenshots, and tune copy/layout.
-2. **Make production API base dynamic** — current built frontend assumes `127.0.0.1:8766`; this is fine for Tauri but awkward for alternate-port smoke tests.
-3. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
-4. **React source management actions** — edit/remove/open/mark checked sources directly from Sources tab, not only during onboarding/HTML admin.
-5. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
-6. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
-7. **Polish setup quality model** — make “Partial / Good / Strong” actionable with specific next steps.
-8. **Package QA** — build `.app`/DMG, verify sidecar startup, first-run onboarding, settings link, and first scan in the Tauri shell.
+1. **Manual human QA from the DMG** — mount `dist/Job Radar.dmg`, install/open the app, complete onboarding, add/edit sources, and run a first scan with real URLs.
+2. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
+3. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
+4. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
+5. **Polish setup quality model** — make “Partial / Good / Strong” actionable with specific next steps.
+6. **Make production API base dynamic** — same-origin API is now used, but alternate-port package QA still needs careful smoke testing.
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
 - Build not notarised — first-launch requires right-click → Open
-- Built frontend currently hardcodes production API base to `http://127.0.0.1:8766/api`, so alternate-port production smoke tests still call the canonical app API.
+- Packaged app launch was verified under automation enough to serve onboarding from the sidecar, but a full manual double-click/DMG install smoke test is still needed for window lifecycle, first scan, and Gatekeeper behavior.

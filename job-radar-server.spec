@@ -11,6 +11,9 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files
 
 datas = collect_data_files("job_radar")
+frontend_dist = Path("frontend/dist")
+if frontend_dist.exists():
+    datas.append((str(frontend_dist), "frontend/dist"))
 
 a = Analysis(
     ["job_radar/cli.py"],
@@ -69,6 +72,7 @@ a = Analysis(
         "job_radar.api.routers.notes",
         "job_radar.api.routers.applications",
         "job_radar.api.routers.blocklist",
+        "job_radar.api.routers.onboarding",
         "job_radar.notes",
         "job_radar.notes.store",
     ],

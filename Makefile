@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-ui build-sidecar build-app sign clean test
+.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test
 
 # Run the old HTML server (admin/settings pages)
 dev:
@@ -26,14 +26,24 @@ build-sidecar:
 	@echo "Sidecar built: dist/job-radar-server/job-radar-server"
 
 # Build the full Tauri .app, copy the sidecar in, then ad-hoc sign
-build-app: build-sidecar
-	export PATH="$$HOME/.cargo/bin:$$PATH" && cargo tauri build
+build-app: build-frontend build-sidecar
+	export PATH="$$HOME/.cargo/bin:$$PATH" && cargo tauri build --bundles app
 	@APP="src-tauri/target/release/bundle/macos/Job Radar.app/Contents/Resources" && \
 	 mkdir -p "$$APP/job-radar-server" && \
 	 cp -R dist/job-radar-server/ "$$APP/job-radar-server/" && \
 	 echo "Sidecar copied into .app bundle"
 	$(MAKE) sign
 	@echo "Done: src-tauri/target/release/bundle/macos/Job Radar.app"
+
+build-dmg: build-app
+	@DMG_ROOT="dist/dmg-root" && \
+	 DMG_PATH="dist/Job Radar.dmg" && \
+	 rm -rf "$$DMG_ROOT" "$$DMG_PATH" && \
+	 mkdir -p "$$DMG_ROOT" && \
+	 cp -R "src-tauri/target/release/bundle/macos/Job Radar.app" "$$DMG_ROOT/" && \
+	 ln -s /Applications "$$DMG_ROOT/Applications" && \
+	 hdiutil create -volname "Job Radar" -srcfolder "$$DMG_ROOT" -ov -format UDZO "$$DMG_PATH" && \
+	 echo "Done: $$DMG_PATH"
 
 # Ad-hoc sign — no Apple account needed, right-click → Open works reliably
 sign:
