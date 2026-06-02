@@ -3,28 +3,33 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from job_radar.config.settings import get_settings
+
 router = APIRouter(prefix="/blocklist", tags=["blocklist"])
 
-_PATH = Path(__file__).parent.parent.parent.parent / "data" / "blocked_phrases.json"
+
+def _path():
+    return get_settings().data_dir / "blocked_phrases.json"
 
 
 def _load() -> list[str]:
-    if not _PATH.exists():
+    path = _path()
+    if not path.exists():
         return []
     try:
-        return json.loads(_PATH.read_text())
+        return json.loads(path.read_text())
     except Exception:
         return []
 
 
 def _save(phrases: list[str]) -> None:
-    _PATH.parent.mkdir(parents=True, exist_ok=True)
-    _PATH.write_text(json.dumps(sorted({p.strip() for p in phrases if p.strip()}), indent=2))
+    path = _path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted({p.strip() for p in phrases if p.strip()}), indent=2))
 
 
 class PhraseBody(BaseModel):

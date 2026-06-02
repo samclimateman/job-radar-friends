@@ -31,7 +31,7 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 ```bash
 make build-app    # build signed .app bundle
 make build-dmg    # build signed .app and local DMG
-make test         # run test suite (153 tests, offline)
+make test         # run test suite (154 tests, offline)
 ```
 
 Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-click → Open on first launch.
@@ -68,9 +68,10 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - **Compact "why matched" column** — shows top 3 matched values (e.g. `Brussels · policy · climate`), excluded jobs get red pill, concerns shown as muted `(1 concern)` note
 - Fresh database initialization bug fixed: migrations no longer run against missing base tables
 - Packaged sidecar includes `frontend/dist` and onboarding router; packaged `.app` serves the React onboarding UI on first launch
+- Block filters persist in the user data directory, so onboarding completion works from read-only DMG/app bundles
 
 ### What's next (prioritised plan)
-1. **Manual human QA from the DMG** — mount `dist/Job Radar.dmg`, install/open the app, complete onboarding, add/edit sources, and run a first scan with real URLs.
+1. **Manual human QA from the DMG** — install/open the app like a friend would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.
 2. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
 3. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
 4. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
@@ -80,4 +81,4 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
 - Build not notarised — first-launch requires right-click → Open
-- Packaged app launch was verified under automation enough to serve onboarding from the sidecar, but a full manual double-click/DMG install smoke test is still needed for window lifecycle, first scan, and Gatekeeper behavior.
+- DMG launch was smoke-tested under automation: React shell, onboarding API, onboarding completion with blockers, needs-review source persistence, and blocklist persistence all passed. A full manual double-click/install test is still needed for window lifecycle, first scan with real URLs, and Gatekeeper behavior.

@@ -141,3 +141,30 @@ Packaged outputs:
 - `dist/Job Radar.dmg`
 
 The packaged app served the React onboarding UI from the frozen sidecar during automated smoke testing. A final manual DMG install/open test is still recommended before sharing with friends.
+
+---
+
+## Later Update: DMG Onboarding Completion Fix
+
+DMG smoke testing found that onboarding completion could fail from the packaged app when blocked terms were included. The source was `job_radar/api/routers/blocklist.py`, which wrote `blocked_phrases.json` to a repo/app-relative `data/` path. In a mounted DMG or packaged app, that path can be read-only or otherwise unsuitable for user state.
+
+Fix:
+- Block filters now persist to `get_settings().data_dir / "blocked_phrases.json"`.
+- Added `tests/test_blocklist_api.py` to lock blocklist persistence to the user data directory.
+- Rebuilt the signed `.app` and `dist/Job Radar.dmg`.
+
+Verification:
+
+```bash
+make build-dmg
+codesign --verify --deep --strict --verbose=2 "/Volumes/Job Radar/Job Radar.app"
+.venv/bin/pytest
+# 154 passed
+```
+
+Packaged smoke test from the rebuilt DMG:
+- `GET /api/onboarding` returned first-run JSON.
+- React shell served from the frozen sidecar.
+- `POST /api/onboarding/complete` succeeded with blocked terms and an LLM-suggested source.
+- Source persisted as `needs_review`.
+- Block filters persisted in the temp user data directory.
