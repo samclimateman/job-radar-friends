@@ -281,6 +281,61 @@ def test_dashboard_includes_notebook_nav(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_description_visible_in_job_detail(tmp_path, monkeypatch):
+    """Regression: raw_description must appear in the job detail HTML. Previous bug made it invisible."""
+    job_id = _seed_job(tmp_path, monkeypatch)
+
+    html = render_job_detail(job_id)
+
+    assert "Full job description." in html
+    assert "jr-description" in html
+    assert "No description captured." not in html
+    get_settings.cache_clear()
+
+
+def test_rubric_preview_scores_correctly(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    from job_radar.app.handlers.dashboard import render_rubric_preview
+    from job_radar.scoring.store import save_rubric
+    save_rubric(
+        strategy_narrative="Policy roles in European institutions",
+        target_locations="Brussels\nBerlin",
+        preferred_industries="policy\nresearch",
+        role_types="analyst\nmanager",
+        seniority="senior",
+        positive_keywords="climate\nEU",
+        negative_keywords="sales",
+        dealbreakers="unpaid",
+    )
+
+    html = render_rubric_preview("Senior Policy Analyst", "EU climate policy research role in Brussels.", "Brussels")
+
+    assert "Rubric Preview" in html
+    assert "strong fit" in html or "good fit" in html
+    assert "Matched" in html
+
+    excluded_html = render_rubric_preview("Unpaid Intern", "unpaid internship sales role", "New York")
+    assert "excluded" in excluded_html
+    get_settings.cache_clear()
+
+
+def test_user_status_survives_rescan(tmp_path, monkeypatch):
+    """Regression: user_status must not be reset when the same job is re-ingested."""
+    job_id = _seed_job(tmp_path, monkeypatch)
+    update_job_status(job_id, "shortlisted")
+
+    execute(
+        "UPDATE jobs SET last_seen_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (job_id,),
+    )
+
+    row = execute("SELECT user_status FROM jobs WHERE id = ?", (job_id,))[0]
+    assert row["user_status"] == "shortlisted"
+    get_settings.cache_clear()
+
+
 def _seed_job(tmp_path, monkeypatch) -> str:
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))

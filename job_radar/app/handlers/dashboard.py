@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from job_radar.app.common import _esc, _empty_row, _provider, _stats
-from job_radar.app.handlers.jobs import _job_row, _job_cards
+from job_radar.app.handlers.jobs import _job_row, _job_cards, _score_label, _explanation
 from job_radar.app.handlers.sources import _source_row
 from job_radar.app.state import get_state
 from job_radar.config.env_file import load_api_env
@@ -191,6 +191,7 @@ def render_dashboard(
         </label>
         <button class="jr-button" type="submit">Save Strategy</button>
       </form>
+      <p style="margin-top:1rem"><a class="jr-small-link" href="/rubric/preview">Test a job against this rubric →</a></p>
     </section>
 
     <section class="jr-band" id="ranked">
@@ -559,3 +560,68 @@ def _strategy_summary(rubric: dict[str, str]) -> str:
       <div class="jr-summary-chips">{''.join(chips)}</div>
     </div>
     """
+
+
+def render_rubric_preview(title: str, description: str, location: str) -> str:
+    import json
+    from job_radar.app.common import _page
+    from job_radar.app.handlers.jobs import _explanation, _score_label
+    from job_radar.ingestion.models import ScrapedJob
+    from job_radar.scoring.deterministic import score_job
+    from job_radar.scoring.rubric import ScoringRubric, split_terms
+
+    rubric_values = active_rubric_values()
+    if not rubric_values:
+        return _page("Rubric Preview", '<p class="jr-help">No strategy saved yet. Save a strategy first.</p>')
+
+    rubric = ScoringRubric(
+        strategy_narrative=rubric_values.get("strategy_narrative", ""),
+        target_locations=split_terms(rubric_values.get("target_locations")),
+        preferred_industries=split_terms(rubric_values.get("preferred_industries")),
+        role_types=split_terms(rubric_values.get("role_types")),
+        seniority=split_terms(rubric_values.get("seniority")),
+        positive_keywords=split_terms(rubric_values.get("positive_keywords")),
+        negative_keywords=split_terms(rubric_values.get("negative_keywords")),
+        dealbreakers=split_terms(rubric_values.get("dealbreakers")),
+    )
+
+    job = ScrapedJob(
+        title=title or "Untitled",
+        organization=None,
+        source_url="https://example.com",
+        raw_description=description or "",
+        location=location or None,
+    )
+    result = score_job(job, rubric)
+
+    explanation_json = json.dumps({
+        "matched": result.matched,
+        "downgraded": result.downgraded,
+        "excluded": result.excluded,
+    })
+    explanation_html = _explanation(explanation_json)
+    label = _score_label(result.score)
+    score_display = f"{result.score:.0f}" if not result.is_excluded else "excluded"
+
+    body = f"""
+    <section class="jr-band detail">
+      <div class="jr-band-heading">
+        <h2>Rubric Preview</h2>
+        <a class="jr-small-link" href="/#strategy">Back to Strategy</a>
+      </div>
+      <p><strong>{_esc(title or "Untitled")}</strong>
+      {f'<span class="muted"> · {_esc(location)}</span>' if location else ''}</p>
+      <p>
+        <span class="pill {'green' if result.score >= 50 else 'amber' if result.score >= 30 else 'neutral'}">{score_display}</span>
+        <span class="muted" style="margin-left:8px;font-size:0.85rem">{_esc(label)}</span>
+      </p>
+      {explanation_html}
+      <form method="post" action="/rubric/preview" class="jr-strategy-grid" style="margin-top:1.5rem">
+        <label><span>Job title</span><input name="title" type="text" value="{_esc(title)}"></label>
+        <label><span>Location</span><input name="location" type="text" value="{_esc(location)}"></label>
+        <label class="wide"><span>Description</span><textarea name="description" rows="6">{_esc(description)}</textarea></label>
+        <button class="jr-button" type="submit">Re-score</button>
+      </form>
+    </section>
+    """
+    return _page("Rubric Preview", body)

@@ -42,7 +42,10 @@ def render_job_detail(job_id: str) -> str:
         </div>
         <div>
           <h3>Fit</h3>
-          <p><span class="pill green">{'Unscored' if row["score"] is None else f'{row["score"]:.1f}'}</span></p>
+          <p>
+            <span class="pill green">{'—' if row["score"] is None else f'{row["score"]:.0f}'}</span>
+            <span class="muted" style="font-size:0.8rem;margin-left:6px">{_score_label(row["score"])}</span>
+          </p>
           {explanation}
         </div>
         <div>
@@ -130,6 +133,18 @@ def _explanation_preview(payload: str | None) -> str:
     return f'<span class="muted">{_esc(parts)}</span>{note}'
 
 
+def _score_label(score: float | None) -> str:
+    if score is None:
+        return "unscored"
+    if score >= 70:
+        return "strong fit"
+    if score >= 50:
+        return "good fit"
+    if score >= 30:
+        return "possible"
+    return "weak"
+
+
 def _score_class(row: dict) -> str:
     if row["is_excluded"]:
         return "amber"
@@ -157,7 +172,8 @@ def _source_status_label(row: dict) -> str:
 
 
 def _job_row(row: dict) -> str:
-    score = "Unscored" if row["score"] is None else f"{row['score']:.1f}"
+    score = "—" if row["score"] is None else f"{row['score']:.0f}"
+    label = _score_label(row["score"])
     score_class = _score_class(row)
     reason = row["exclusion_reason"] or ""
     explanation = _explanation_preview(row.get("explanation_json"))
@@ -170,7 +186,7 @@ def _job_row(row: dict) -> str:
       <td>{html.escape(row["organization"] or "")}</td>
       <td>{html.escape(row["location"] or "")}</td>
       <td>{lifecycle_pill}<br><span class="pill neutral">{html.escape(row["user_status"] or "new")}</span></td>
-      <td><span class="pill {score_class}">{score}</span></td>
+      <td><span class="pill {score_class}" title="{label}">{score}</span><br><span class="muted" style="font-size:0.7rem">{label}</span></td>
       <td class="muted">{explanation}</td>
       <td class="muted">{seen}</td>
       <td>{_esc(row["platform"] or "")}</td>
@@ -191,7 +207,7 @@ def _job_cards(rows: list[dict]) -> str:
 
 
 def _job_card(row: dict) -> str:
-    score = "Unscored" if row["score"] is None else f"{row['score']:.0f}"
+    score = "—" if row["score"] is None else f"{row['score']:.0f}"
     matched = _explanation_bits(row.get("explanation_json"), "matched", 2)
     concern = row["exclusion_reason"] or "; ".join(_explanation_bits(row.get("explanation_json"), "downgraded", 1))
     concern = concern or "No major concern recorded"
@@ -199,7 +215,7 @@ def _job_card(row: dict) -> str:
     return f"""
     <article class="jr-job-card">
       <div class="jr-card-topline">
-        <span class="pill {_score_class(row)}">Fit {score}</span>
+        <span class="pill {_score_class(row)}">{score} · {_score_label(row["score"])}</span>
         <span class="pill neutral">{_esc(row["user_status"] or "new")}</span>
       </div>
       <h3>{_esc(row["title"] or "")}</h3>

@@ -10,7 +10,7 @@ from importlib.resources import files
 from urllib.parse import parse_qs, urlparse
 
 from job_radar.app.common import _first, _split_urls
-from job_radar.app.handlers.dashboard import render_dashboard, _scan_report_from_result
+from job_radar.app.handlers.dashboard import render_dashboard, render_rubric_preview, _scan_report_from_result
 from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database
 from job_radar.app.handlers.jobs import render_job_detail, update_job_status
 from job_radar.app.handlers.notes import render_notebook, render_note_detail
@@ -32,6 +32,7 @@ from job_radar.app.handlers.dashboard import (  # noqa: F401
     OPENAI_KEYS_URL,
     _stats,
     render_dashboard,
+    render_rubric_preview,
 )
 from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database  # noqa: F401
 from job_radar.app.handlers.jobs import render_job_detail, update_job_status  # noqa: F401
@@ -140,6 +141,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/notebook/note":
             params = parse_qs(parsed.query)
             self._send_html(render_note_detail(_first(params, "note_id") or ""))
+            return
+        if parsed.path == "/rubric/preview":
+            self._send_html(render_rubric_preview("", "", ""))
             return
 
         params = parse_qs(parsed.query)
@@ -332,6 +336,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if note_id:
                 archive_note(note_id)
             self._redirect("/notebook")
+            return
+
+        if self.path == "/rubric/preview":
+            title = _first(form, "title") or ""
+            description = _first(form, "description") or ""
+            location = _first(form, "location") or ""
+            self._send_html(render_rubric_preview(title, description, location))
             return
 
         if self.path == "/notes/delete":
