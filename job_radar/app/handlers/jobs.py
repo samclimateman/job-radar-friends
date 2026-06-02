@@ -171,17 +171,36 @@ def _source_status_label(row: dict) -> str:
     return "source healthy"
 
 
+def _fmt_seen(value: str | None) -> str:
+    if not value:
+        return "—"
+    try:
+        from datetime import date, datetime, timezone
+        d = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        today = date.today()
+        diff = (today - d.date()).days
+        time_str = d.strftime("%H:%M")
+        if diff == 0:
+            return f"today · {time_str}"
+        if diff == 1:
+            return f"yesterday · {time_str}"
+        return d.strftime("%-d %b")
+    except Exception:
+        return value[:10] if value else "—"
+
+
 def _job_row(row: dict) -> str:
     score = "—" if row["score"] is None else f"{row['score']:.0f}"
     label = _score_label(row["score"])
     score_class = _score_class(row)
     reason = row["exclusion_reason"] or ""
     explanation = _explanation_preview(row.get("explanation_json"))
-    seen = _esc(row["first_seen_at"] or "")
+    seen = _fmt_seen(row.get("first_seen_at"))
     lifecycle = row.get("lifecycle_status") or "active"
     lifecycle_pill = _lifecycle_pill(lifecycle)
+    job_id = _esc(row["id"])
     return f"""
-    <tr>
+    <tr class="jr-job-row">
       <td><strong>{html.escape(row["title"] or "")}</strong>{f'<br><span class="muted">{html.escape(reason)}</span>' if reason else ''}</td>
       <td>{html.escape(row["organization"] or "")}</td>
       <td>{html.escape(row["location"] or "")}</td>
@@ -190,9 +209,18 @@ def _job_row(row: dict) -> str:
       <td class="muted">{explanation}</td>
       <td class="muted">{seen}</td>
       <td>{_esc(row["platform"] or "")}</td>
-      <td><a class="jr-link" href="{html.escape(row["source_url"] or "#")}" target="_blank" rel="noreferrer">Open</a></td>
+      <td>
+        <div class="jr-row-actions">
+          <form method="post" action="/jobs/status" class="jr-dismiss-form" title="Dismiss — hide from all views">
+            <input type="hidden" name="job_id" value="{job_id}">
+            <input type="hidden" name="status" value="archived">
+            <button class="jr-dismiss-btn" type="submit">×</button>
+          </form>
+          <a class="jr-link" href="{html.escape(row["source_url"] or "#")}" target="_blank" rel="noreferrer">Open</a>
+        </div>
+      </td>
       <td class="actions-cell">
-        <a class="jr-small-link" href="/job?job_id={_esc(row["id"])}">Details</a>
+        <a class="jr-small-link" href="/job?job_id={job_id}">Details</a>
         {_job_status_actions(row["id"])}
       </td>
     </tr>

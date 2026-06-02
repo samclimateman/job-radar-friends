@@ -650,6 +650,37 @@ th {
   flex-wrap: wrap;
 }
 
+.jr-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jr-dismiss-form {
+  display: inline;
+}
+
+.jr-dismiss-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--line);
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  opacity: 0;
+}
+
+.jr-job-row:hover .jr-dismiss-btn {
+  opacity: 1;
+}
+
+.jr-dismiss-btn:hover {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
 .source-edit-form {
   display: grid;
   grid-template-columns: minmax(90px, 0.8fr) minmax(160px, 1.4fr) auto;

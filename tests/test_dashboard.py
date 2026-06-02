@@ -281,6 +281,19 @@ def test_dashboard_includes_notebook_nav(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_archived_jobs_hidden_from_best_matches(tmp_path, monkeypatch):
+    """Regression: archived/rejected jobs must not appear in Best Matches or New views."""
+    job_id = _seed_job(tmp_path, monkeypatch)
+    update_job_status(job_id, "archived")
+
+    html = render_dashboard(view="best")
+    assert "Policy Analyst" not in html
+
+    html2 = render_dashboard(view="new")
+    assert "Policy Analyst" not in html2
+    get_settings.cache_clear()
+
+
 def test_description_visible_in_job_detail(tmp_path, monkeypatch):
     """Regression: raw_description must appear in the job detail HTML. Previous bug made it invisible."""
     job_id = _seed_job(tmp_path, monkeypatch)

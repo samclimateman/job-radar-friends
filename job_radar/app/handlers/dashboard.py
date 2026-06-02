@@ -17,7 +17,8 @@ OLLAMA_DOWNLOAD_URL = "https://ollama.com/download"
 
 _ACTIVE = (
     "j.is_live = 1 AND j.is_excluded = 0 "
-    "AND j.lifecycle_status NOT IN ('probably_closed', 'dead')"
+    "AND j.lifecycle_status NOT IN ('probably_closed', 'dead') "
+    "AND j.user_status NOT IN ('archived', 'rejected')"
 )
 
 
@@ -323,6 +324,7 @@ def _radar_section() -> str:
         FROM jobs j
         LEFT JOIN job_scores js ON js.job_id = j.id
         WHERE j.lifecycle_status = 'new'
+          AND j.user_status NOT IN ('archived', 'rejected')
         ORDER BY j.first_seen_at DESC
         LIMIT 8
         """
@@ -333,6 +335,7 @@ def _radar_section() -> str:
         FROM jobs j
         LEFT JOIN job_scores js ON js.job_id = j.id
         WHERE j.lifecycle_status = 'reappeared'
+          AND j.user_status NOT IN ('archived', 'rejected')
         ORDER BY j.last_seen_at DESC
         LIMIT 5
         """
