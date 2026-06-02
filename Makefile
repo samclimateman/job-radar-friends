@@ -1,8 +1,23 @@
-.PHONY: dev build-sidecar build-app sign clean
+.PHONY: dev dev-api dev-ui build-sidecar build-app sign clean test
 
-# Run the Python server directly (no Tauri)
+# Run the old HTML server (admin/settings pages)
 dev:
 	.venv/bin/job-radar start
+
+# Run FastAPI backend for the React dashboard
+dev-api:
+	.venv/bin/uvicorn job_radar.api.main:app --port 8766 --reload
+
+# Run React frontend dev server (proxies /api → :8766)
+dev-ui:
+	cd frontend && npm run dev
+
+# Build React frontend for production
+build-frontend:
+	cd frontend && npm run build
+
+test:
+	.venv/bin/pytest
 
 # Compile the Python server into a standalone binary via PyInstaller
 build-sidecar:
