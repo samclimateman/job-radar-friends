@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-from job_radar.api.routers import jobs, sources, refresh, notes, applications, blocklist
+from job_radar.api.routers import jobs, sources, refresh, notes, applications, blocklist, onboarding
 from job_radar.db.client import init_db
 
 app = FastAPI(title="Job Radar API", version="0.1.0")
@@ -32,6 +32,7 @@ app.include_router(refresh.router, prefix="/api")
 app.include_router(notes.router, prefix="/api")
 app.include_router(applications.router, prefix="/api")
 app.include_router(blocklist.router, prefix="/api")
+app.include_router(onboarding.router, prefix="/api")
 
 # Serve the built React frontend from frontend/dist if it exists
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"

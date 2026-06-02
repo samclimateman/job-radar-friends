@@ -4,19 +4,19 @@
 
 ## What this is
 
-A distributable version of career-ops for non-technical friends. Packaged as a macOS `.dmg` via Tauri. Users install it like a normal app — no terminal, no Python environment visible. Local SQLite, local Python backend, React/Tailwind dashboard.
+A universal, distributable version of Job Radar for non-technical users. Packaged as a macOS `.dmg` via Tauri. Users install it like a normal app — no terminal, no Python environment visible. Local SQLite, local Python backend, React/Tailwind dashboard.
 
 Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYSTEM.md). Roadmap and product direction in [ROADMAP_2_0.md](ROADMAP_2_0.md).
 
-## Key differences from career-ops (Sam's version)
+## Key differences from career-ops / personal versions
 
 - **SQLite** not PostgreSQL — simpler, no service to manage
 - **Tauri desktop shell** — wraps the Python server, no terminal for users
 - **RSS connector** — additional scraper type (`ingestion/sources/rss.py`)
 - **SmartRecruiters scraper** — additional platform (`ingestion/sources/smartrecruiters.py`)
 - **No Datasette** — React dashboard only (FastAPI backend)
-- **No Ollama/AI classification** — scoring is deterministic only
-- **No personal profile/scoring tuning** — generic ecosystem packs instead
+- **No required LLM API** — deterministic scanning/scoring works without paid keys
+- **Universal onboarding** — user-specific local setup, not Sam-specific copy or SaaS/accounts
 
 ## Stack
 
@@ -30,7 +30,7 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 
 ```bash
 make build        # build DMG
-make test         # run test suite (40 tests, offline)
+make test         # run test suite (149 tests, offline)
 ```
 
 Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-click → Open on first launch.
@@ -45,28 +45,37 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - **Sprint 1–3:** Tauri shell, RSS connector, lifecycle tracking, confidence scoring, dashboard surfaces, source packs
 - **Phase 1 (May 2026):** Schema, data layer, SQLite export, 32 tests
 - **Phase 2 (May 2026):** Notebook UI, CRUD routes, 8 new tests
+- **React/FastAPI migration (June 2026):** React dashboard on FastAPI, HTML admin/settings server on companion port
+- **Universal onboarding v1/v2 (June 2026):** first-run wizard, optional LLM prompt/paste expansion, source review, setup quality banner
 
 ### What's working
 - Full ingestion pipeline: fetch → filter → score → upsert → stale detection
 - Platform scrapers: Greenhouse, Lever, Personio, Ashby, Workable, RSS, SmartRecruiters
-- Tauri desktop shell — opens React dashboard, no terminal visible
+- Tauri desktop shell — starts FastAPI dashboard on `:8766` and HTML admin/settings on `:8767`
+- React dashboard with Jobs, Sources, Applied, and Notebook tabs
+- First-run universal onboarding for users with local persistence and resumable progress
+- Optional LLM-assisted organization expansion via manual copy/paste prompt; no API key required
+- Source review in onboarding: verified/manual-check flags, priority, notes, and LLM-suggested source handling
+- Setup quality banner after onboarding: source count, verified count, unchecked sources, block filters, scan state
 - Notebook/notes UI with CRUD routes
 - Source health view in dashboard
 - Confidence scoring + lifecycle tracking (discovered → reviewing → applied etc.)
 - macOS DMG build with ad-hoc signing
 - **Job search** — text input below view tabs, filters by title/org/location via `?q=` param; limit raised 25→200
 - **Compact "why matched" column** — shows top 3 matched values (e.g. `Brussels · policy · climate`), excluded jobs get red pill, concerns shown as muted `(1 concern)` note
+- Fresh database initialization bug fixed: migrations no longer run against missing base tables
 
 ### What's next (prioritised plan)
-1. **Split `server.py`** (1927 lines) into `handlers/` — routing only in server.py; unblocks all future work
-2. **Source packs UI** — browser page + import button (YAMLs + loader.py already exist, just need UI wiring)
-3. **Wire source packs into onboarding wizard** step
-4. **Scan report** shown after refresh — N sources, N new, N failed
-5. **Source Health Center** — zero-jobs vs error distinction, per-source actions
-6. **Score verbal labels** — strong / good / possible / weak
-7. **Rubric editor with preview-score** input
-8. Tests: description visibility regression, notes/status survive rescan, zero-vs-error source distinction
+1. **Manual QA fresh install onboarding** — run against an isolated data dir on canonical port `8766`, click through all screens, inspect screenshots, and tune copy/layout.
+2. **Make production API base dynamic** — current built frontend assumes `127.0.0.1:8766`; this is fine for Tauri but awkward for alternate-port smoke tests.
+3. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
+4. **React source management actions** — edit/remove/open/mark checked sources directly from Sources tab, not only during onboarding/HTML admin.
+5. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
+6. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
+7. **Polish setup quality model** — make “Partial / Good / Strong” actionable with specific next steps.
+8. **Package QA** — build `.app`/DMG, verify sidecar startup, first-run onboarding, settings link, and first scan in the Tauri shell.
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
 - Build not notarised — first-launch requires right-click → Open
+- Built frontend currently hardcodes production API base to `http://127.0.0.1:8766/api`, so alternate-port production smoke tests still call the canonical app API.

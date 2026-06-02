@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { api } from './api'
-import type { Job, JobDetail, Radar, SourceHealthSummary, Stats, Application, Note } from './api'
+import type {
+  Job, JobDetail, Radar, SourceHealthSummary, Stats, Application, Note,
+  OnboardingAnswers, OnboardingState, OnboardingSource
+} from './api'
 
 // Open a URL: uses macOS `open` via Tauri command when running in the desktop
 // app, falls back to window.open in the browser.
@@ -153,15 +157,15 @@ function applyFilters(jobs: Job[], search: string, locationFilter: string, block
 
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ stats, tab, onTab, onRefresh, refreshing, onNotebook }: {
+function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook }: {
   stats: Stats | null; tab: AppTab; onTab: (t: AppTab) => void
-  onRefresh: () => void; refreshing: boolean; onNotebook: () => void
+  appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void
 }) {
   return (
     <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-slate-200 text-sm flex-shrink-0">
       <button onClick={() => onTab('jobs')}
         className="font-semibold text-slate-800 flex items-center gap-1.5 mr-1 hover:text-slate-600 transition-colors">
-        <span>📡</span> Job Radar
+        <span>📡</span> {appTitle}
       </button>
       <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
         {([['jobs', 'Jobs'], ['applied', 'Applied'], ['sources', 'Sources']] as [AppTab, string][]).map(([t, label]) => (
@@ -1368,12 +1372,679 @@ function NoteListItem({ note, selected, onClick }: { note: Note; selected: boole
   )
 }
 
+// ── Onboarding ────────────────────────────────────────────────────────────────
+
+const ONBOARDING_STEPS = [
+  'Welcome',
+  'Name your Radar',
+  'Setup expectations',
+  'Current role',
+  'Ideal role',
+  'Locations',
+  'Search criteria',
+  'Add sources',
+  'Expand your radar',
+  'Review sources',
+  'Review strategy',
+  'First scan',
+]
+
+const DEFAULT_SOURCE: OnboardingSource = {
+  organization: '',
+  url: '',
+  notes: '',
+  priority: null,
+  verified: false,
+  llm_suggested: false,
+  review_status: '',
+}
+
+const DEFAULT_ONBOARDING: OnboardingAnswers = {
+  name: '',
+  current_role: '',
+  ideal_role: '',
+  locations: [],
+  avoid_constraints: '',
+  target_titles: '',
+  themes: [],
+  custom_themes: '',
+  blocked_terms: '',
+  role_types_to_avoid: [],
+  sources: [{ ...DEFAULT_SOURCE }],
+  strategy_summary: '',
+}
+
+const LOCATION_CHIPS = [
+  'Brussels', 'Berlin', 'The Hague', 'Amsterdam', 'London',
+  'Geneva', 'Zurich', 'Paris', 'Remote Europe', 'Hybrid Europe',
+]
+
+const THEME_CHIPS = [
+  'International affairs', 'Foreign policy', 'Geopolitics', 'Energy security',
+  'Industrial strategy', 'Economic security', 'Critical infrastructure',
+  'Climate policy', 'Defence policy', 'European security', 'Strategic foresight',
+  'Trade policy', 'Resilience', 'Public-sector strategy',
+]
+
+const ROLE_AVOID_CHIPS = [
+  'Internships', 'Graduate schemes', 'Junior admin roles', 'Generic communications',
+  'Sales / business development', 'Fundraising', 'Technical engineering roles',
+  'Software developer roles', 'Roles requiring existing clearance',
+  'Roles requiring native-level language skills',
+]
+
+function lines(value: string): string[] {
+  return value.replace(/,/g, '\n').split('\n').map(v => v.trim()).filter(Boolean)
+}
+
+function generatedStrategy(a: OnboardingAnswers) {
+  const titles = lines(a.target_titles)
+  const themes = [...a.themes, ...lines(a.custom_themes)]
+  const blockers = [...lines(a.blocked_terms), ...a.role_types_to_avoid]
+  const prioritize = [...titles.slice(0, 6), ...themes.slice(0, 8)].join(', ') || 'roles matching your search criteria'
+  const locations = a.locations.join(', ') || 'your preferred locations'
+  const downgrade = blockers.slice(0, 10).join(', ') || 'roles outside your stated criteria'
+  return [
+    `Prioritize ${prioritize} in ${locations}.`,
+    `Downgrade or flag ${downgrade}.`,
+    'Monitor selected organizations first. Prefer verified vacancies pages. Flag broken or uncertain sources instead of hiding them.',
+  ].join('\n\n')
+}
+
+function generatedOrgPrompt(a: OnboardingAnswers) {
+  const orgs = a.sources
+    .filter(s => s.organization.trim() || s.url.trim())
+    .map(s => `${s.organization || 'Unknown organization'} — ${s.url || 'URL not provided'}`)
+    .join('\n')
+  return `I am setting up a personal job radar. Based on the profile below, suggest 15-25 high-quality organizations I should monitor for relevant jobs.
+
+Prioritize relevance over volume.
+
+Current role:
+${a.current_role || 'Not specified'}
+
+Ideal job:
+${a.ideal_role || 'Not specified'}
+
+Target locations:
+${a.locations.join(', ') || 'Not specified'}
+
+Target job titles:
+${a.target_titles || 'Not specified'}
+
+Priority themes:
+${[...a.themes, ...lines(a.custom_themes)].join(', ') || 'Not specified'}
+
+Roles or terms to avoid:
+${[...lines(a.blocked_terms), ...a.role_types_to_avoid].join(', ') || 'Not specified'}
+
+Organizations already added:
+${orgs || 'None yet'}
+
+Please return a table with:
+1. Organization name
+2. Why it fits
+3. Country/city
+4. Main career page URL
+5. Specific vacancies page URL if different
+6. Likely job board platform if obvious
+7. Priority score from 1-10
+8. Whether I should manually verify the URL
+
+Do not invent URLs. If unsure, say "needs manual checking."`
+}
+
+function inferSourceStatus(source: OnboardingSource) {
+  const url = source.url.trim().toLowerCase()
+  if (!url) return 'Missing URL'
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return 'Possible broken link'
+  if (source.verified) return 'Ready'
+  if (source.llm_suggested) return 'Needs manual check'
+  if (/\/(careers|jobs|vacancies|join-us|openings|positions|work-with-us)/.test(url)) return 'Looks like a careers page'
+  if (/greenhouse|lever|ashby|workable|smartrecruiters|personio/.test(url)) return 'Looks like a job board'
+  return 'Likely homepage'
+}
+
+function parsePastedSources(raw: string): OnboardingSource[] {
+  return raw.split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !/^[-|:\s]+$/.test(line))
+    .map(line => {
+      const cells = line.split('|').map(c => c.trim()).filter(Boolean)
+      const text = cells.length >= 2 ? cells.join(' ') : line
+      const url = text.match(/https?:\/\/[^\s|)]+/)?.[0]?.replace(/[.,;]+$/, '') ?? ''
+      const priorityMatch = text.match(/\b(10|[1-9])\b/g)
+      const organization = (cells[0] || line.replace(url, '')).replace(/^\d+[\).]\s*/, '').trim()
+      return {
+        ...DEFAULT_SOURCE,
+        organization: organization.slice(0, 120),
+        url,
+        notes: text.replace(url, '').slice(0, 240),
+        priority: priorityMatch ? Number(priorityMatch[priorityMatch.length - 1]) : null,
+        llm_suggested: true,
+        verified: false,
+        review_status: 'Needs manual check',
+      }
+    })
+    .filter(s => s.organization || s.url)
+}
+
+function ChipToggle({ label, active, onToggle }: { label: string; active: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-colors
+        ${active ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function OnboardingFooter({ step, canContinue, continueLabel, onBack, onContinue, onSkip }: {
+  step: number
+  canContinue: boolean
+  continueLabel?: string
+  onBack: () => void
+  onContinue: () => void
+  onSkip?: () => void
+}) {
+  const pct = Math.round((step / (ONBOARDING_STEPS.length - 1)) * 100)
+  return (
+    <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center gap-4">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span className="font-medium text-slate-700">Step {step} of {ONBOARDING_STEPS.length - 1}</span>
+          <span>{ONBOARDING_STEPS[step]}</span>
+        </div>
+        <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-slate-800 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      {onSkip && (
+        <button onClick={onSkip} className="px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-700">
+          Skip for now
+        </button>
+      )}
+      <button onClick={onBack} disabled={step === 0}
+        className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+        Back
+      </button>
+      <button onClick={onContinue} disabled={!canContinue}
+        className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-40 transition-colors">
+        {continueLabel ?? 'Continue'}
+      </button>
+    </div>
+  )
+}
+
+function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
+  initialState: OnboardingState | null
+  onTitle: (title: string) => void
+  onDone: () => void
+  onViewSources: () => void
+}) {
+  const [step, setStep] = useState(initialState?.last_step ?? 0)
+  const [answers, setAnswers] = useState<OnboardingAnswers>(initialState?.answers ?? DEFAULT_ONBOARDING)
+  const [saving, setSaving] = useState(false)
+  const [scanStarted, setScanStarted] = useState(false)
+  const [sourceResult, setSourceResult] = useState<number | null>(null)
+  const [llmPaste, setLlmPaste] = useState('')
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
+
+  useEffect(() => {
+    const title = answers.name.trim() ? `${answers.name.trim()}'s Job Radar` : 'Job Radar'
+    onTitle(title)
+    document.title = title
+  }, [answers.name])
+
+  function setAnswer<K extends keyof OnboardingAnswers>(key: K, value: OnboardingAnswers[K]) {
+    setAnswers(prev => ({ ...prev, [key]: value }))
+  }
+
+  function toggleList(key: 'locations' | 'themes' | 'role_types_to_avoid', value: string) {
+    setAnswers(prev => {
+      const current = prev[key]
+      const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
+      return { ...prev, [key]: next }
+    })
+  }
+
+  function updateSource(idx: number, patch: Partial<OnboardingSource>) {
+    setAnswers(prev => ({
+      ...prev,
+      sources: prev.sources.map((s, i) => i === idx ? { ...s, ...patch } : s),
+    }))
+  }
+
+  function addSourceRow() {
+    setAnswers(prev => ({ ...prev, sources: [...prev.sources, { ...DEFAULT_SOURCE }] }))
+  }
+
+  function removeSourceRow(idx: number) {
+    setAnswers(prev => ({ ...prev, sources: prev.sources.filter((_, i) => i !== idx).length
+      ? prev.sources.filter((_, i) => i !== idx)
+      : [{ ...DEFAULT_SOURCE }] }))
+  }
+
+  async function persist(nextStep = step, partial = false, nextAnswers = answers) {
+    setSaving(true)
+    try {
+      await api.saveOnboarding({ last_step: nextStep, partial, answers: nextAnswers })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function go(nextStep: number, partial = false) {
+    let nextAnswers = answers
+    if (nextStep === 10 && !answers.strategy_summary.trim()) {
+      nextAnswers = { ...answers, strategy_summary: generatedStrategy(answers) }
+      setAnswers(nextAnswers)
+    }
+    await persist(nextStep, partial, nextAnswers)
+    setStep(nextStep)
+  }
+
+  async function completeAndScan() {
+    const finalAnswers = {
+      ...answers,
+      strategy_summary: answers.strategy_summary.trim() || generatedStrategy(answers),
+      sources: answers.sources.filter(s => s.url.trim()),
+    }
+    setAnswers(finalAnswers)
+    setSaving(true)
+    try {
+      const result = await api.completeOnboarding(finalAnswers)
+      setSourceResult(result.sources_added)
+      await api.startRefresh()
+      setScanStarted(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const validSources = answers.sources.filter(s => s.url.trim()).length
+  const canContinue = (() => {
+    if (step === 1) return !!answers.name.trim()
+    if (step === 7) return validSources > 0
+    if (step === 9) return validSources > 0
+    return true
+  })()
+
+  return (
+    <div className="h-screen bg-slate-50 flex flex-col font-sans">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          {step === 0 && (
+            <OnboardingScreen title="Job hunting is terrible.">
+              <p>Especially when you are looking for something specific.</p>
+              <p>That is why Job Radar exists.</p>
+              <p>It watches the organizations you care about, tracks new roles, and helps you spot the ones actually worth your time.</p>
+            </OnboardingScreen>
+          )}
+
+          {step === 1 && (
+            <OnboardingScreen title="First things first. What should I call you?">
+              <input
+                autoFocus
+                value={answers.name}
+                onChange={e => setAnswer('name', e.target.value)}
+                placeholder="Your name"
+                className="w-full max-w-md text-lg border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+              />
+              <p className="text-sm text-slate-400">
+                {answers.name.trim() ? `The app will become ${answers.name.trim()}'s Job Radar.` : 'This updates the app title locally.'}
+              </p>
+            </OnboardingScreen>
+          )}
+
+          {step === 2 && (
+            <OnboardingScreen title="Good setup takes a few minutes.">
+              <p>A useful setup takes about 10-15 minutes. A strong setup takes about 30.</p>
+              <p>The point is to do the thinking once, so Job Radar can keep watching the right places.</p>
+              <div className="grid sm:grid-cols-2 gap-3 pt-2">
+                {['Define what you are looking for', 'Add career pages you care about', 'Review the source list', 'Start the first scan'].map(item => (
+                  <div key={item} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    <span className="text-emerald-600 font-semibold mr-2">✓</span>{item}
+                  </div>
+                ))}
+              </div>
+            </OnboardingScreen>
+          )}
+
+          {step === 3 && (
+            <OnboardingScreen title="What is your current job title?">
+              <input
+                value={answers.current_role}
+                onChange={e => setAnswer('current_role', e.target.value)}
+                placeholder="Senior Policy Manager, Industrial Innovation & Carbon Capture"
+                className="w-full text-base border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+              />
+            </OnboardingScreen>
+          )}
+
+          {step === 4 && (
+            <OnboardingScreen title="Describe your ideal job.">
+              <textarea
+                value={answers.ideal_role}
+                onChange={e => setAnswer('ideal_role', e.target.value)}
+                rows={7}
+                placeholder="Example: I want a policy, strategy, research, operations, or international affairs role focused on the themes I care about."
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 resize-none leading-relaxed"
+              />
+            </OnboardingScreen>
+          )}
+
+          {step === 5 && (
+            <OnboardingScreen title="Where are you job hunting?">
+              <div className="flex flex-wrap gap-2">
+                {LOCATION_CHIPS.map(loc => (
+                  <ChipToggle key={loc} label={loc} active={answers.locations.includes(loc)}
+                    onToggle={() => toggleList('locations', loc)} />
+                ))}
+              </div>
+              <input
+                value={answers.avoid_constraints}
+                onChange={e => setAnswer('avoid_constraints', e.target.value)}
+                placeholder="Anything to avoid? Example: no full relocation, no roles requiring existing clearance."
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200"
+              />
+            </OnboardingScreen>
+          )}
+
+          {step === 6 && (
+            <OnboardingScreen title="What should Job Radar look for?">
+              <OnboardingField label="Target job titles">
+                <textarea value={answers.target_titles} onChange={e => setAnswer('target_titles', e.target.value)}
+                  rows={6} placeholder={'Senior Policy Manager\nStrategy Manager\nProgramme Manager\nAssociate Director'}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 resize-none" />
+              </OnboardingField>
+              <OnboardingField label="Priority themes">
+                <div className="flex flex-wrap gap-2">
+                  {THEME_CHIPS.map(theme => (
+                    <ChipToggle key={theme} label={theme} active={answers.themes.includes(theme)}
+                      onToggle={() => toggleList('themes', theme)} />
+                  ))}
+                </div>
+                <input value={answers.custom_themes} onChange={e => setAnswer('custom_themes', e.target.value)}
+                  placeholder="Other themes, comma separated"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200" />
+              </OnboardingField>
+              <OnboardingField label="Block filters">
+                <textarea value={answers.blocked_terms} onChange={e => setAnswer('blocked_terms', e.target.value)}
+                  rows={4} placeholder={'intern\ntrainee\nsales\nnative German\nactive security clearance required'}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 resize-none" />
+                <div className="flex flex-wrap gap-2">
+                  {ROLE_AVOID_CHIPS.map(role => (
+                    <ChipToggle key={role} label={role} active={answers.role_types_to_avoid.includes(role)}
+                      onToggle={() => toggleList('role_types_to_avoid', role)} />
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">Blocked terms downgrade and filter views; excluded jobs remain inspectable.</p>
+              </OnboardingField>
+            </OnboardingScreen>
+          )}
+
+          {step === 7 && (
+            <OnboardingScreen title="Add 5-10 organizations you actually care about.">
+              <p>Paste the exact page where vacancies appear, not just the homepage. Aim for at least 5. Ten is better.</p>
+              <div className="space-y-3">
+                {answers.sources.map((source, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_1.4fr_auto] gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                    <input value={source.organization} onChange={e => updateSource(idx, { organization: e.target.value })}
+                      placeholder="Organization"
+                      className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                    <input value={source.url} onChange={e => updateSource(idx, { url: e.target.value })}
+                      placeholder="https://example.org/careers"
+                      className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+                    <button onClick={() => removeSourceRow(idx)}
+                      className="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-red-500">
+                      Remove
+                    </button>
+                    <div className="col-span-3 flex items-center gap-3">
+                      <input value={source.notes} onChange={e => updateSource(idx, { notes: e.target.value })}
+                      placeholder="Notes, priority, or manual check reminder"
+                        className="flex-1 text-xs border border-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-100" />
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap">
+                        <input type="checkbox" checked={source.verified}
+                          onChange={e => updateSource(idx, { verified: e.target.checked })}
+                          className="rounded border-slate-300" />
+                        Checked
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={addSourceRow}
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                Add organization
+              </button>
+              <p className="text-xs text-slate-400">Job Radar will detect known boards and flag uncertain pages in source health.</p>
+            </OnboardingScreen>
+          )}
+
+          {step === 8 && (
+            <OnboardingScreen title="Find more organizations worth tracking.">
+              <p>Optional: copy this prompt into ChatGPT, Claude, Gemini, or a local model. Paste the results back here and Job Radar will add them to the review list.</p>
+              <textarea readOnly value={generatedOrgPrompt(answers)} rows={12}
+                className="w-full text-xs border border-slate-200 rounded-xl px-4 py-3 bg-white text-slate-600 focus:outline-none resize-none leading-relaxed" />
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  navigator.clipboard?.writeText(generatedOrgPrompt(answers))
+                  setCopiedPrompt(true)
+                  setTimeout(() => setCopiedPrompt(false), 1600)
+                }}
+                  className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
+                  {copiedPrompt ? 'Copied' : 'Copy prompt'}
+                </button>
+              </div>
+              <textarea value={llmPaste} onChange={e => setLlmPaste(e.target.value)} rows={7}
+                placeholder="Paste the LLM's organization table or list here..."
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 resize-none leading-relaxed" />
+              <button onClick={() => {
+                const parsed = parsePastedSources(llmPaste)
+                if (parsed.length === 0) return
+                setAnswers(prev => ({
+                  ...prev,
+                  sources: [...prev.sources.filter(s => s.url.trim() || s.organization.trim()), ...parsed],
+                }))
+                setLlmPaste('')
+              }}
+                disabled={!llmPaste.trim()}
+                className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                Add pasted organizations
+              </button>
+              <p className="text-xs text-slate-400">LLM-suggested URLs are marked as needing manual check until you verify them.</p>
+            </OnboardingScreen>
+          )}
+
+          {step === 9 && (
+            <OnboardingScreen title="Review your source list.">
+              <p>These are the organizations Job Radar will monitor first. A good source is a real vacancies page, not a vague homepage.</p>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      {['Organization', 'Career page', 'Priority', 'Status', ''].map(h => (
+                        <th key={h} className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {answers.sources.filter(s => s.url.trim() || s.organization.trim()).map((source, idx) => {
+                      const status = inferSourceStatus(source)
+                      const realIdx = answers.sources.indexOf(source)
+                      return (
+                        <tr key={`${source.organization}-${idx}`} className="border-b border-slate-100">
+                          <td className="px-3 py-2">
+                            <input value={source.organization} onChange={e => updateSource(realIdx, { organization: e.target.value })}
+                              className="w-full text-sm border border-transparent hover:border-slate-200 focus:border-slate-300 rounded px-2 py-1 focus:outline-none" />
+                            {source.llm_suggested && <span className="text-[10px] text-violet-500 font-medium">LLM suggested</span>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input value={source.url} onChange={e => updateSource(realIdx, { url: e.target.value })}
+                              className="w-full text-xs border border-transparent hover:border-slate-200 focus:border-slate-300 rounded px-2 py-1 focus:outline-none" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input type="number" min={1} max={10} value={source.priority ?? ''}
+                              onChange={e => updateSource(realIdx, { priority: e.target.value ? Number(e.target.value) : null })}
+                              className="w-16 text-xs border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sky-100" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              status === 'Ready' || status.includes('job board') || status.includes('careers')
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : status === 'Missing URL' || status.includes('broken')
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            {source.url && <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-sky-600 hover:underline mr-3">Open</a>}
+                            <button onClick={() => updateSource(realIdx, { verified: !source.verified })}
+                              className="text-xs text-slate-600 hover:text-slate-900 font-medium">
+                              {source.verified ? 'Uncheck' : 'Mark checked'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-slate-400">Unchecked LLM sources will be saved for manual review instead of silently failing.</p>
+            </OnboardingScreen>
+          )}
+
+          {step === 10 && (
+            <OnboardingScreen title="Review your Radar strategy.">
+              <p>Here is how Job Radar will interpret your search. Edit anything that feels off.</p>
+              <textarea
+                value={answers.strategy_summary || generatedStrategy(answers)}
+                onChange={e => setAnswer('strategy_summary', e.target.value)}
+                rows={10}
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 resize-none leading-relaxed"
+              />
+            </OnboardingScreen>
+          )}
+
+          {step === 11 && (
+            <OnboardingScreen title="Onboarding complete.">
+              <p>{scanStarted ? 'Your first scan is running now.' : 'Ready to start your first scan.'}</p>
+              <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500">Sources queued</span><span className="font-semibold text-slate-800">{validSources}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Sources added</span><span className="font-semibold text-slate-800">{sourceResult ?? 'Not started'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">First scan</span><span className="font-semibold text-slate-800">{scanStarted ? 'Running' : 'Ready'}</span></div>
+              </div>
+              {scanStarted && (
+                <div className="flex gap-2">
+                  <button onClick={onDone}
+                    className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
+                    Go to dashboard
+                  </button>
+                  <button onClick={onViewSources}
+                    className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    View source health
+                  </button>
+                </div>
+              )}
+            </OnboardingScreen>
+          )}
+        </div>
+      </div>
+
+      <OnboardingFooter
+        step={step}
+        canContinue={canContinue && !saving}
+        continueLabel={step === 0 ? 'Start setup' : step === 2 ? "I'm ready" : step === 11 ? (scanStarted ? 'Go to dashboard' : 'Start first scan') : 'Continue'}
+        onBack={() => step > 0 && go(step - 1)}
+        onContinue={() => {
+          if (step === 11) {
+            if (scanStarted) onDone()
+            else completeAndScan()
+          } else {
+            go(step + 1)
+          }
+        }}
+        onSkip={step > 2 && step < 8 ? () => go(step + 1, true) : step === 8 ? () => go(9, true) : step === 2 ? () => go(7, true) : undefined}
+      />
+    </div>
+  )
+}
+
+function OnboardingScreen({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">First-run setup</p>
+        <h1 className="text-3xl font-semibold text-slate-900 tracking-normal">{title}</h1>
+      </div>
+      <div className="space-y-4 text-base text-slate-600 leading-relaxed">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function OnboardingField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      {children}
+    </div>
+  )
+}
+
+function SetupQualityBanner({ onboarding, stats, refreshing }: {
+  onboarding: OnboardingState | null
+  stats: Stats | null
+  refreshing: boolean
+}) {
+  if (!onboarding?.completed) return null
+  const answers = onboarding.answers
+  const sources = answers.sources.filter(s => s.url.trim())
+  const verified = sources.filter(s => s.verified).length
+  const unchecked = Math.max(0, sources.length - verified)
+  const blockConfigured = lines(answers.blocked_terms).length + answers.role_types_to_avoid.length > 0
+  const strategyConfigured = !!answers.strategy_summary.trim()
+  const quality =
+    sources.length >= 10 && verified >= 5 && blockConfigured && strategyConfigured ? 'Strong'
+    : sources.length >= 5 && strategyConfigured ? 'Good'
+    : 'Partial'
+  const qualityClass =
+    quality === 'Strong' ? 'text-emerald-700 bg-emerald-100'
+    : quality === 'Good' ? 'text-sky-700 bg-sky-100'
+    : 'text-amber-700 bg-amber-100'
+
+  return (
+    <div className="mx-6 mt-5 rounded-xl border border-slate-200 bg-white px-5 py-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${qualityClass}`}>
+          Radar setup: {quality}
+        </span>
+        <span className="text-xs text-slate-500"><strong className="text-slate-800">{sources.length}</strong> sources added</span>
+        <span className="text-xs text-slate-500"><strong className="text-slate-800">{verified}</strong> verified</span>
+        {unchecked > 0 && <span className="text-xs text-amber-600"><strong>{unchecked}</strong> need manual check</span>}
+        <span className="text-xs text-slate-500">{blockConfigured ? 'Block filters configured' : 'No block filters yet'}</span>
+        <span className="text-xs text-slate-500">{refreshing ? 'First scan running' : stats?.last_refresh ? 'Scan history available' : 'Ready to scan'}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [stats, setStats]               = useState<Stats | null>(null)
   const [radar, setRadar]               = useState<Radar | null>(null)
   const [jobs, setJobs]                 = useState<Job[]>([])
+  const [onboarding, setOnboarding]     = useState<OnboardingState | null>(null)
+  const [onboardingLoaded, setOnboardingLoaded] = useState(false)
+  const [appTitle, setAppTitle]         = useState('Job Radar')
   const [view, setView]                 = useState('best')
   const [search, setSearch]             = useState('')
   const [locationFilter, setLocation]   = useState('')
@@ -1393,6 +2064,13 @@ export default function App() {
     api.stats().then(setStats).catch(console.error)
     api.radar().then(setRadar).catch(console.error)
     api.getBlocklist().then(setBlocklist).catch(console.error)
+    api.onboarding()
+      .then(state => {
+        setOnboarding(state)
+        if (state.answers.name.trim()) setAppTitle(`${state.answers.name.trim()}'s Job Radar`)
+      })
+      .catch(console.error)
+      .finally(() => setOnboardingLoaded(true))
     loadJobs()
   }, [])
 
@@ -1455,16 +2133,42 @@ export default function App() {
     api.removeFromBlocklist(phrase).then(setBlocklist).catch(console.error)
   }
 
+  function refreshAppData() {
+    api.stats().then(setStats).catch(console.error)
+    api.radar().then(setRadar).catch(console.error)
+    api.getBlocklist().then(setBlocklist).catch(console.error)
+    loadJobs()
+  }
+
+  function finishOnboarding(targetTab: AppTab = 'jobs') {
+    api.onboarding().then(setOnboarding).catch(console.error)
+    refreshAppData()
+    setTab(targetTab)
+    setSelectedId(null)
+  }
+
   const filtered = useMemo(
     () => applyFilters(jobs, search, locationFilter, blocklist, sortCol, sortDir),
     [jobs, search, locationFilter, blocklist, sortCol, sortDir]
   )
 
   const panelOpen = selectedId !== null && tab === 'jobs'
+  const shouldShowOnboarding = onboardingLoaded && onboarding && !onboarding.completed && stats !== null && stats.sources === 0
+
+  if (shouldShowOnboarding) {
+    return (
+      <OnboardingWizard
+        initialState={onboarding}
+        onTitle={setAppTitle}
+        onDone={() => finishOnboarding('jobs')}
+        onViewSources={() => finishOnboarding('sources')}
+      />
+    )
+  }
 
   return (
     <div className="h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
-      <StatsBar stats={stats} tab={tab}
+      <StatsBar stats={stats} tab={tab} appTitle={appTitle}
         onTab={t => { setTab(t); setSelectedId(null) }}
         onRefresh={handleRefresh} refreshing={refreshing}
         onNotebook={() => { setTab('notebook'); setSelectedId(null) }} />
@@ -1485,6 +2189,7 @@ export default function App() {
                   </a>
                 </div>
               )}
+              <SetupQualityBanner onboarding={onboarding} stats={stats} refreshing={refreshing} />
               <RadarPanel radar={radar} selectedId={selectedId} onSelectJob={id => { setSelectedId(id); setTab('jobs') }}
                 onLocationFilter={handleLocationFilter} />
 

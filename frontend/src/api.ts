@@ -136,6 +136,52 @@ export interface Note {
   updated_at: string
 }
 
+export interface OnboardingSource {
+  organization: string
+  url: string
+  notes: string
+  priority: number | null
+  verified: boolean
+  llm_suggested: boolean
+  review_status: string
+}
+
+export interface OnboardingAnswers {
+  name: string
+  current_role: string
+  ideal_role: string
+  locations: string[]
+  avoid_constraints: string
+  target_titles: string
+  themes: string[]
+  custom_themes: string
+  blocked_terms: string
+  role_types_to_avoid: string[]
+  sources: OnboardingSource[]
+  strategy_summary: string
+}
+
+export interface OnboardingState {
+  completed: boolean
+  partial: boolean
+  last_step: number
+  answers: OnboardingAnswers
+}
+
+export interface OnboardingCompleteResult {
+  ok: boolean
+  sources_added: number
+  partial: boolean
+  sources: {
+    id: string
+    organization: string | null
+    url: string
+    platform: string
+    status: string
+    note: string | null
+  }[]
+}
+
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(BASE + path, window.location.origin)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
@@ -200,4 +246,9 @@ export const api = {
     patch<Note>(`/notes/${id}`, patch_data),
   archiveNote: (id: string) => post<{ ok: boolean }>(`/notes/${id}/archive`),
   deleteNote: (id: string) => del<{ ok: boolean }>(`/notes/${id}`),
+  onboarding: () => get<OnboardingState>('/onboarding'),
+  saveOnboarding: (state: Partial<Pick<OnboardingState, 'partial' | 'last_step' | 'answers'>>) =>
+    patch<OnboardingState>('/onboarding', state),
+  completeOnboarding: (answers: OnboardingAnswers) =>
+    post<OnboardingCompleteResult>('/onboarding/complete', answers),
 }
