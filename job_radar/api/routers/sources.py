@@ -26,8 +26,13 @@ def get_stats():
     jobs = execute("SELECT COUNT(*) AS n FROM jobs WHERE is_live = 1 AND is_excluded = 0")[0]["n"]
     sources = execute("SELECT COUNT(*) AS n FROM sources WHERE status != 'disabled'")[0]["n"]
     issues = execute(
-        """SELECT COUNT(*) AS n FROM source_health
-           WHERE error_status IS NOT NULL OR manual_review_needed = 1 OR likely_broken_url = 1"""
+        """SELECT COUNT(*) AS n
+           FROM sources s
+           LEFT JOIN source_health h ON h.source_id = s.id
+           WHERE s.status = 'needs_review'
+              OR h.error_status IS NOT NULL
+              OR h.manual_review_needed = 1
+              OR h.likely_broken_url = 1"""
     )[0]["n"]
     last_run = execute(
         "SELECT finished_at FROM runs WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1"
@@ -90,7 +95,10 @@ def get_source_health():
         "SELECT started_at, finished_at FROM runs ORDER BY started_at DESC LIMIT 1"
     )
     generated_at = last_run[0]["finished_at"] if last_run else None
-    succeeded = sum(1 for r in sources if not r.get("error_status") and r.get("last_successful_at"))
+    succeeded = sum(
+        1 for r in sources
+        if r["status"] == "active" and not r.get("error_status") and r.get("last_successful_at")
+    )
     failed = sum(1 for r in sources if r.get("error_status"))
 
     results = [
@@ -101,7 +109,9 @@ def get_source_health():
             "platform": r["platform"] or "",
             "status": r["status"],
             "notes": r.get("notes"),
-            "success": not bool(r.get("error_status")),
+            "success": r["status"] == "active" and not bool(r.get("error_status")),
+            "manual_review_needed": r["status"] == "needs_review" or bool(r.get("manual_review_needed")),
+            "likely_broken_url": bool(r.get("likely_broken_url")),
             "jobs_found": r.get("jobs_found") or 0,
             "jobs_new": r.get("new_jobs_found") or 0,
             "jobs_updated": 0,

@@ -103,3 +103,19 @@ def test_source_health_includes_editable_fields(tmp_path, monkeypatch):
     assert result["status"] == "active"
     assert result["notes"] == "Watch weekly"
     get_settings.cache_clear()
+
+
+def test_source_health_flags_needs_review_sources_as_issues(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    source = add_source("https://example.org/careers", "Example")
+
+    health = get_source_health()
+    result = health["results"][0]
+    assert result["source_id"] == source.id
+    assert result["status"] == "needs_review"
+    assert result["success"] is False
+    assert result["manual_review_needed"] is True
+    assert health["summary"]["sources_succeeded"] == 0
+    get_settings.cache_clear()

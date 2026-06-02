@@ -69,6 +69,8 @@ export interface SourceResult {
   status: string
   notes: string | null
   success: boolean
+  manual_review_needed: boolean
+  likely_broken_url: boolean
   jobs_found: number
   jobs_new: number
   jobs_updated: number

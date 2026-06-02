@@ -855,8 +855,8 @@ function SourcesView() {
     r.platform.toLowerCase().includes(search.toLowerCase()) ||
     r.source_id.toLowerCase().includes(search.toLowerCase())
   )
-  const issues = results.filter(r => !r.success || r.error)
-  const ok = results.filter(r => r.success && !r.error)
+  const issues = results.filter(r => r.manual_review_needed || r.likely_broken_url || !r.success || r.error)
+  const ok = results.filter(r => !r.manual_review_needed && !r.likely_broken_url && r.success && !r.error)
 
   function confBadge(label: string | null) {
     if (!label || label === 'unknown') return 'bg-slate-100 text-slate-500'
@@ -986,6 +986,10 @@ function SourceTable({
                 <td className="px-4 py-2.5">
                   {disabled
                     ? <span className="text-xs text-slate-500 font-medium">Disabled</span>
+                    : r.manual_review_needed
+                      ? <span className="text-xs text-amber-600 font-medium">Needs manual check</span>
+                    : r.likely_broken_url
+                      ? <span className="text-xs text-red-600 font-medium">Possible broken URL</span>
                     : r.success
                       ? <span className="text-xs text-emerald-600 font-medium">✓ Working</span>
                       : <span className="text-xs text-red-600" title={r.error ?? ''}>
@@ -1763,6 +1767,8 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
   const [saving, setSaving] = useState(false)
   const [scanStarted, setScanStarted] = useState(false)
   const [sourceResult, setSourceResult] = useState<number | null>(null)
+  const [scannableResult, setScannableResult] = useState<number | null>(null)
+  const [reviewResult, setReviewResult] = useState<number | null>(null)
   const [llmPaste, setLlmPaste] = useState('')
   const [copiedPrompt, setCopiedPrompt] = useState(false)
 
@@ -1830,9 +1836,15 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
     setSaving(true)
     try {
       const result = await api.completeOnboarding(finalAnswers)
+      const scannable = result.sources.filter(s => s.status === 'active').length
+      const needsReview = result.sources.filter(s => s.status === 'needs_review').length
       setSourceResult(result.sources_added)
-      await api.startRefresh()
-      setScanStarted(true)
+      setScannableResult(scannable)
+      setReviewResult(needsReview)
+      if (scannable > 0) {
+        await api.startRefresh()
+        setScanStarted(true)
+      }
     } finally {
       setSaving(false)
     }
@@ -2107,13 +2119,25 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
 
           {step === 11 && (
             <OnboardingScreen title="Onboarding complete.">
-              <p>{scanStarted ? 'Your first scan is running now.' : 'Ready to start your first scan.'}</p>
+              <p>
+                {scanStarted
+                  ? 'Your first scan is running now.'
+                  : sourceResult !== null && scannableResult === 0
+                    ? 'Your sources were saved, but they need manual review before Job Radar can scan them.'
+                    : 'Ready to start your first scan.'}
+              </p>
               <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">Sources queued</span><span className="font-semibold text-slate-800">{validSources}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Sources added</span><span className="font-semibold text-slate-800">{sourceResult ?? 'Not started'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">First scan</span><span className="font-semibold text-slate-800">{scanStarted ? 'Running' : 'Ready'}</span></div>
+                {sourceResult !== null && (
+                  <>
+                    <div className="flex justify-between"><span className="text-slate-500">Scannable now</span><span className="font-semibold text-slate-800">{scannableResult ?? 0}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Need manual check</span><span className="font-semibold text-amber-700">{reviewResult ?? 0}</span></div>
+                  </>
+                )}
+                <div className="flex justify-between"><span className="text-slate-500">First scan</span><span className="font-semibold text-slate-800">{scanStarted ? 'Running' : sourceResult !== null && scannableResult === 0 ? 'Not started' : 'Ready'}</span></div>
               </div>
-              {scanStarted && (
+              {sourceResult !== null && (
                 <div className="flex gap-2">
                   <button onClick={onViewSources}
                     className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50">
@@ -2129,11 +2153,11 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
       <OnboardingFooter
         step={step}
         canContinue={canContinue && !saving}
-        continueLabel={step === 0 ? 'Start setup' : step === 2 ? "I'm ready" : step === 11 ? (scanStarted ? 'Go to dashboard' : 'Start first scan') : 'Continue'}
+        continueLabel={step === 0 ? 'Start setup' : step === 2 ? "I'm ready" : step === 11 ? (sourceResult !== null ? 'Go to dashboard' : 'Start first scan') : 'Continue'}
         onBack={() => step > 0 && go(step - 1)}
         onContinue={() => {
           if (step === 11) {
-            if (scanStarted) onDone()
+            if (sourceResult !== null) onDone()
             else completeAndScan()
           } else {
             go(step + 1)

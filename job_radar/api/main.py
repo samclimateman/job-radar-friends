@@ -41,9 +41,19 @@ _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 def startup():
     init_db()
 
-if _DIST.exists():
+
+@app.get("/api/health")
+def health():
+    return {
+        "ok": True,
+        "app": "job-radar",
+        "version": app.version,
+    }
+
+if (_DIST / "assets").exists():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
+if (_DIST / "index.html").exists():
     @app.get("/{full_path:path}", include_in_schema=False)
     def serve_spa(full_path: str):
         index = _DIST / "index.html"

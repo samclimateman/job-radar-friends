@@ -7,6 +7,30 @@ fn is_port_open(port: u16) -> bool {
     std::net::TcpStream::connect(("127.0.0.1", port)).is_ok()
 }
 
+fn is_job_radar_server(port: u16) -> bool {
+    use std::io::{Read, Write};
+
+    let Ok(mut stream) = std::net::TcpStream::connect(("127.0.0.1", port)) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(800)));
+    let _ = stream.set_write_timeout(Some(std::time::Duration::from_millis(800)));
+
+    if stream
+        .write_all(b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+
+    let mut response = String::new();
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+
+    response.contains("\"app\":\"job-radar\"") || response.contains("\"app\": \"job-radar\"")
+}
+
 /// Resolve the bundled sidecar binary.
 ///
 /// Search order:
@@ -56,13 +80,23 @@ fn find_sidecar() -> Option<std::path::PathBuf> {
 /// The sidecar is a PyInstaller-compiled `job-radar start --no-open` binary.
 /// Returns the child process handle for clean shutdown, plus any warning messages.
 fn start_server() -> (Option<std::process::Child>, Vec<String>) {
-    if is_port_open(PORT) {
+    if is_job_radar_server(PORT) {
         // Already running (e.g. dev mode with server started separately)
         return (None, vec![]);
     }
 
     let log_dir = dirs_path();
+    let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("startup.log");
+
+    if is_port_open(PORT) {
+        let msg = format!(
+            "Port {} is already in use by another local process. Close it and reopen Job Radar.",
+            PORT
+        );
+        let _ = std::fs::write(&log_path, format!("[ERROR] {}\n", msg));
+        return (None, vec![msg]);
+    }
 
     let Some(sidecar) = find_sidecar() else {
         let msg = "job-radar server binary not found. Run `make build-sidecar` to build it.".to_string();
@@ -86,7 +120,7 @@ fn start_server() -> (Option<std::process::Child>, Vec<String>) {
     // Wait up to 10s for the server to bind
     for _ in 0..20 {
         std::thread::sleep(std::time::Duration::from_millis(500));
-        if is_port_open(PORT) {
+        if is_job_radar_server(PORT) {
             break;
         }
     }
@@ -110,7 +144,7 @@ pub fn run() {
             let (child, warnings) = start_server();
             *server_proc_setup.lock().unwrap() = child;
 
-            let url = if is_port_open(PORT) {
+            let url = if is_job_radar_server(PORT) {
                 WebviewUrl::External(
                     format!("http://127.0.0.1:{}/", PORT)
                         .parse()

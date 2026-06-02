@@ -1,30 +1,18 @@
 # Job Radar Friend Install
 
-This is the current practical install path for a tech-comfortable friend on macOS.
+This is the current practical install path for a small macOS beta.
 
 ## Install
 
-### Easiest macOS path
+### GitHub Release DMG
 
-Double-click:
+1. Download the latest beta DMG:
+   `https://github.com/samclimateman/job-radar-friends/releases`
+2. Open `Job.Radar.dmg`.
+3. Drag **Job Radar.app** to **Applications**.
+4. Open **Job Radar**.
 
-```text
-Install Job Radar.command
-```
-
-This creates the local Python environment, installs dependencies, creates
-`~/Applications/Job Radar.app`, and opens the app. After that, launch it from
-Finder, the Dock, or:
-
-```text
-Open Job Radar.command
-```
-
-If the app does not open, check:
-
-```text
-~/.job-radar/launcher.log
-```
+This beta is not Apple Developer ID notarized yet. If macOS blocks the first launch, right-click **Job Radar.app**, choose **Open**, then confirm.
 
 ### Terminal path
 
@@ -41,17 +29,11 @@ Then open `~/Applications/Job Radar.app` once and choose **Keep in Dock**.
 
 ## First Run
 
-1. Paste 10-50 career-page URLs.
-2. Add your search strategy:
-   - target locations
-   - industries
-   - role types
-   - seniority
-   - positive keywords
-   - negative keywords
-   - dealbreakers
-3. Optional: configure AI provider links in **AI Setup**.
-4. Click **Refresh Now**.
+1. Complete the first-run onboarding.
+2. Add 3-10 organization career pages.
+3. Prefer real job board URLs such as Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, or RSS feeds.
+4. If a source is flagged **Needs manual check**, open it, verify it is a real vacancies page, then mark it checked in Source Health.
+5. Start the first scan and review Jobs and Source Health.
 
 ## AI Setup
 
@@ -63,7 +45,7 @@ Provider setup links are shown in the app:
 - Claude / Anthropic API keys: `https://console.anthropic.com/settings/keys`
 - Ollama local install: `https://ollama.com/download`
 
-Keys are saved in `~/.job-radar/.env`. Later versions should use macOS Keychain.
+Keys are saved in `~/.job-radar/.env` only if you add them from the legacy settings page. The React onboarding flow does not require API keys.
 
 ## Data
 

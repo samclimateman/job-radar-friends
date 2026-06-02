@@ -19,7 +19,15 @@ Job Radar tracks career pages, stores scraped jobs locally in SQLite, and ranks 
 
 ---
 
-## Quick start (macOS)
+## Download beta (macOS)
+
+The current friend beta is distributed as a GitHub Release DMG:
+
+https://github.com/samclimateman/job-radar-friends/releases
+
+Download `Job.Radar.dmg`, open it, drag **Job Radar.app** to **Applications**, then launch the app. This beta is ad-hoc signed, not Apple Developer ID notarized, so macOS may require right-click → **Open** on first launch.
+
+## Developer quick start (macOS)
 
 **Install:**
 
@@ -91,7 +99,7 @@ job-radar doctor                   # Check local runtime
 
 ---
 
-## Desktop app (macOS, alpha)
+## Desktop app build (macOS, alpha)
 
 A Tauri-based desktop wrapper is included. It spawns the Python server and opens the dashboard in a native window.
 
@@ -107,7 +115,13 @@ make build-sidecar   # requires PyInstaller: pip install pyinstaller
 make build-app
 ```
 
-The resulting `Job Radar.app` in `src-tauri/target/release/bundle/macos/` can be moved to your Applications folder. Icons are placeholder — replace `src-tauri/icons/` before distributing.
+**Build the local DMG:**
+
+```bash
+make build-dmg
+```
+
+The resulting `Job Radar.app` lives in `src-tauri/target/release/bundle/macos/`; the DMG is written to `dist/Job Radar.dmg`.
 
 ---
 
@@ -118,7 +132,7 @@ All data is stored in `~/.job-radar/` by default. Override with `JOB_RADAR_DATA_
 ```
 ~/.job-radar/
   job-radar.db      SQLite database
-  .env              Optional API keys (LLM classification)
+  .env              Optional API keys if configured manually
 ```
 
 Back up the database from the dashboard (Ranked Jobs → Backup DB) or via CLI:
@@ -164,7 +178,7 @@ Tests do not require network access. All scraper tests use fixtures.
 | Today's Radar view | Working |
 | Source Builder | Working |
 | Source packs | Alpha (Brussels Policy Pack bundled) |
-| Tauri desktop shell | Alpha (unsigned) |
+| Tauri desktop shell | Beta (ad-hoc signed DMG) |
 | HTTP caching (ETag/Last-Modified) | Planned |
 | Full backup zip (config + CSV) | Planned |
-| Signed / notarized DMG | Planned |
+| Developer ID notarized DMG | Planned |
