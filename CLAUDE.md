@@ -8,7 +8,7 @@ A public beta of the universal, distributable version of Job Radar for non-techn
 
 The product benchmark is not "works for friends" anymore. Treat this as an early independent desktop app that should eventually feel good enough for people to pay for: trustworthy install, calm onboarding, reliable scans, transparent source health, useful ranking, backup/export, and no private-data leakage.
 
-Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYSTEM.md). Roadmap and product direction in [ROADMAP_2_0.md](ROADMAP_2_0.md).
+Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYSTEM.md). Roadmap and product direction in [ROADMAP_2_0.md](ROADMAP_2_0.md). Public beta audit prompt in [docs/AUDIT_PROMPT.md](docs/AUDIT_PROMPT.md).
 
 ## Key differences from career-ops / personal versions
 

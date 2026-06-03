@@ -115,6 +115,8 @@ make version-bump-major
 
 `make public-check` runs the version/name check before Ruff, tests, and the frontend build.
 
+For a deeper product/code review, use [docs/AUDIT_PROMPT.md](docs/AUDIT_PROMPT.md). It is tuned for the public beta benchmark: excellent UX, backend quality, security/privacy, packaging trust, and public-release hygiene.
+
 ---
 
 ## Desktop app build (macOS, beta)
