@@ -14,7 +14,7 @@ function openExternal(url: string) {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type AppTab = 'jobs' | 'sources' | 'applied' | 'notebook'
+type AppTab = 'jobs' | 'sources' | 'applied' | 'notebook' | 'settings'
 type SortCol = 'title' | 'organization' | 'location' | 'application_status' | 'strategic_fit_score' | 'first_seen_at' | 'source'
 type SortDir = 'asc' | 'desc'
 
@@ -188,9 +188,9 @@ function UpdateBanner({ version, downloadUrl, onDismiss }: {
 
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook }: {
+function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook, onSettings }: {
   stats: Stats | null; tab: AppTab; onTab: (t: AppTab) => void
-  appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void
+  appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void; onSettings: () => void
 }) {
   return (
     <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-slate-200 text-sm flex-shrink-0">
@@ -230,10 +230,14 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
               : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
           Notebook
         </button>
-        <a href="http://127.0.0.1:8767" target="_blank" rel="noreferrer"
-          className="px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors">
-          Settings ↗
-        </a>
+        <button
+          onClick={onSettings}
+          className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors
+            ${tab === 'settings'
+              ? 'border-slate-800 bg-slate-800 text-white'
+              : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+          Settings
+        </button>
         <button onClick={onRefresh} disabled={refreshing}
           className="px-3 py-1.5 rounded-md bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 disabled:opacity-50 transition-colors">
           {refreshing ? '↻ Refreshing…' : '↻ Refresh Now'}
@@ -2267,6 +2271,170 @@ function OnboardingField({ label, children }: { label: string; children: ReactNo
   )
 }
 
+// ── Settings view ─────────────────────────────────────────────────────────────
+
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-sm font-semibold text-slate-700 pb-2 border-b border-slate-100">{title}</h3>
+      <div className="space-y-5">{children}</div>
+    </div>
+  )
+}
+
+function SettingsField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+      {children}
+    </div>
+  )
+}
+
+function SettingsView({ onboarding, onSaved }: { onboarding: OnboardingState | null; onSaved: () => void }) {
+  const [answers, setAnswers] = useState<OnboardingAnswers>(normalizeOnboardingAnswers(onboarding?.answers))
+  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
+
+  useEffect(() => {
+    setAnswers(normalizeOnboardingAnswers(onboarding?.answers))
+  }, [onboarding])
+
+  function setAnswer<K extends keyof OnboardingAnswers>(key: K, value: OnboardingAnswers[K]) {
+    setAnswers(prev => ({ ...prev, [key]: value }))
+  }
+
+  function toggleList(key: 'locations' | 'themes' | 'role_types_to_avoid', value: string) {
+    setAnswers(prev => {
+      const current = prev[key]
+      const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
+      return { ...prev, [key]: next }
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setSaveState('idle')
+    try {
+      const finalAnswers = {
+        ...answers,
+        strategy_summary: answers.strategy_summary.trim() || generatedStrategy(answers),
+      }
+      await api.completeOnboarding(finalAnswers)
+      await api.saveOnboarding({ answers: finalAnswers })
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2500)
+      onSaved()
+    } catch {
+      setSaveState('error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200'
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-8 py-8 space-y-10">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-800">Settings</h2>
+          <p className="text-sm text-slate-500 mt-1">Update your criteria at any time. Changes are applied to scoring and filtering immediately on save.</p>
+        </div>
+
+        <SettingsSection title="Identity">
+          <SettingsField label="Your name">
+            <input value={answers.name} onChange={e => setAnswer('name', e.target.value)}
+              className={`${inputCls} max-w-xs`} />
+          </SettingsField>
+          <SettingsField label="Current role">
+            <input value={answers.current_role} onChange={e => setAnswer('current_role', e.target.value)}
+              className={inputCls} />
+          </SettingsField>
+          <SettingsField label="Ideal job">
+            <textarea value={answers.ideal_role} onChange={e => setAnswer('ideal_role', e.target.value)}
+              rows={4} className={`${inputCls} resize-none leading-relaxed`} />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection title="Where you're looking">
+          <SettingsField label="Locations">
+            <div className="flex flex-wrap gap-2">
+              {LOCATION_CHIPS.map(loc => (
+                <ChipToggle key={loc} label={loc} active={answers.locations.includes(loc)}
+                  onToggle={() => toggleList('locations', loc)} />
+              ))}
+            </div>
+          </SettingsField>
+          <SettingsField label="Location constraints" hint="Anything to avoid, e.g. no full relocation.">
+            <input value={answers.avoid_constraints} onChange={e => setAnswer('avoid_constraints', e.target.value)}
+              className={inputCls} />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection title="What you're looking for">
+          <SettingsField label="Target job titles">
+            <textarea value={answers.target_titles} onChange={e => setAnswer('target_titles', e.target.value)}
+              rows={5} placeholder={"Senior Policy Manager\nStrategy Manager\nProgramme Manager"}
+              className={`${inputCls} resize-none`} />
+          </SettingsField>
+          <SettingsField label="Priority themes">
+            <div className="flex flex-wrap gap-2 mb-2">
+              {THEME_CHIPS.map(theme => (
+                <ChipToggle key={theme} label={theme} active={answers.themes.includes(theme)}
+                  onToggle={() => toggleList('themes', theme)} />
+              ))}
+            </div>
+            <input value={answers.custom_themes} onChange={e => setAnswer('custom_themes', e.target.value)}
+              placeholder="Other themes, comma separated" className={inputCls} />
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection title="Block filters">
+          <SettingsField label="Terms to block" hint="Blocked terms downgrade and filter views; excluded jobs remain inspectable.">
+            <textarea value={answers.blocked_terms} onChange={e => setAnswer('blocked_terms', e.target.value)}
+              rows={4} placeholder={"intern\ntrainee\nsales"}
+              className={`${inputCls} resize-none`} />
+          </SettingsField>
+          <SettingsField label="Role types to avoid">
+            <div className="flex flex-wrap gap-2">
+              {ROLE_AVOID_CHIPS.map(role => (
+                <ChipToggle key={role} label={role} active={answers.role_types_to_avoid.includes(role)}
+                  onToggle={() => toggleList('role_types_to_avoid', role)} />
+              ))}
+            </div>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection title="Radar strategy">
+          <SettingsField label="Strategy summary" hint="Used to score and rank jobs. Edit directly or regenerate from your criteria above.">
+            <textarea value={answers.strategy_summary} onChange={e => setAnswer('strategy_summary', e.target.value)}
+              rows={6} className={`${inputCls} resize-none leading-relaxed`} />
+            <button onClick={() => setAnswer('strategy_summary', generatedStrategy(answers))}
+              className="text-xs text-sky-600 hover:text-sky-800 font-medium transition-colors mt-1">
+              Regenerate from criteria
+            </button>
+          </SettingsField>
+        </SettingsSection>
+
+        <SettingsSection title="Sources">
+          <p className="text-sm text-slate-500">Add, edit, or remove monitored career pages in the <strong className="text-slate-700">Sources</strong> tab.</p>
+        </SettingsSection>
+
+        <div className="pt-2 flex items-center gap-4">
+          <button onClick={handleSave} disabled={saving}
+            className="px-6 py-2.5 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 disabled:opacity-40 transition-colors">
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+          {saveState === 'saved' && <span className="text-sm text-emerald-600 font-medium">✓ Saved</span>}
+          {saveState === 'error' && <span className="text-sm text-red-500">Save failed — try again</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SetupQualityBanner({ onboarding, stats, refreshing }: {
   onboarding: OnboardingState | null
   stats: Stats | null
@@ -2445,14 +2613,15 @@ export default function App() {
       <StatsBar stats={stats} tab={tab} appTitle={appTitle}
         onTab={t => { setTab(t); setSelectedId(null) }}
         onRefresh={handleRefresh} refreshing={refreshing}
-        onNotebook={() => { setTab('notebook'); setSelectedId(null) }} />
+        onNotebook={() => { setTab('notebook'); setSelectedId(null) }}
+        onSettings={() => { setTab('settings'); setSelectedId(null) }} />
       {updateInfo && !updateDismissed && (
         <UpdateBanner version={updateInfo.version} downloadUrl={updateInfo.download_url}
           onDismiss={() => setUpdateDismissed(true)} />
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <div className={`flex-1 ${tab === 'notebook' ? 'overflow-hidden flex' : 'overflow-y-auto'}`}>
+        <div className={`flex-1 ${tab === 'notebook' ? 'overflow-hidden flex' : 'overflow-y-auto'} ${tab === 'settings' ? 'overflow-y-auto' : ''}`}>
           {tab === 'jobs' && (
             <>
               {stats && stats.sources === 0 && (
@@ -2550,6 +2719,16 @@ export default function App() {
           {tab === 'sources' && <SourcesView />}
           {tab === 'applied' && <AppliedView />}
           {tab === 'notebook' && <NotebookView />}
+          {tab === 'settings' && (
+            <SettingsView
+              onboarding={onboarding}
+              onSaved={() => {
+                api.onboarding().then(setOnboarding).catch(console.error)
+                api.getBlocklist().then(setBlocklist).catch(console.error)
+                refreshAppData()
+              }}
+            />
+          )}
         </div>
 
         {panelOpen && (
