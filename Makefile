@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test
+.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test public-check
 
 # Run the old HTML server (admin/settings pages)
 dev:
@@ -18,6 +18,9 @@ build-frontend:
 
 test:
 	.venv/bin/pytest
+
+public-check:
+	.venv/bin/python scripts/public_check.py
 
 # Compile the Python server into a standalone binary via PyInstaller
 build-sidecar:

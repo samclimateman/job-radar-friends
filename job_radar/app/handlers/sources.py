@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 
-from job_radar.app.common import _esc, _empty_row, _page
+from job_radar.app.common import _empty_row, _esc, _page
 from job_radar.db.client import execute
 from job_radar.ingestion.source_detection import detect_source
 

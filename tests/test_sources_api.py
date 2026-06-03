@@ -1,5 +1,5 @@
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
 from job_radar.api.routers.sources import (
     SourceUpdate,

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
+
 from job_radar.db.client import execute
 
 router = APIRouter(prefix="/applications", tags=["applications"])

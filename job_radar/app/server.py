@@ -9,43 +9,37 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from urllib.parse import parse_qs, urlparse
 
-from job_radar.app.common import _first, _split_urls
-from job_radar.app.handlers.dashboard import render_dashboard, render_rubric_preview, _scan_report_from_result
-from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database
-from job_radar.app.handlers.jobs import render_job_detail, update_job_status
-from job_radar.app.handlers.notes import render_notebook, render_note_detail
-from job_radar.app.handlers.source_packs import render_source_packs, import_source_pack
-from job_radar.app.handlers.sources import render_source_builder, render_source_health_center, update_source, update_source_notes, set_source_status
-from job_radar.app.state import get_state, set_state
-from job_radar.config.env_file import load_api_env, save_api_env
-from job_radar.config.settings import get_settings
-from job_radar.db.client import execute, init_db
-from job_radar.ingestion.runner import run_ingestion
-from job_radar.ingestion.source_store import add_source, mark_manual_checked
-from job_radar.scoring.store import save_rubric
-from job_radar.app.common import _port_open, _find_free_port
+from job_radar.app.common import _find_free_port, _first, _port_open, _split_urls
 
 # Re-exports for backward compatibility (tests and external callers import from here)
 from job_radar.app.handlers.dashboard import (  # noqa: F401
     ANTHROPIC_KEYS_URL,
     OLLAMA_DOWNLOAD_URL,
     OPENAI_KEYS_URL,
+    _scan_report_from_result,
     _stats,
     render_dashboard,
     render_rubric_preview,
 )
-from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database  # noqa: F401
-from job_radar.app.handlers.jobs import render_job_detail, update_job_status  # noqa: F401
-from job_radar.app.handlers.notes import render_notebook, render_note_detail  # noqa: F401
-from job_radar.app.handlers.source_packs import render_source_packs, import_source_pack  # noqa: F401
-from job_radar.app.handlers.sources import (  # noqa: F401
+from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database
+from job_radar.app.handlers.jobs import render_job_detail, update_job_status
+from job_radar.app.handlers.notes import render_note_detail, render_notebook
+from job_radar.app.handlers.source_packs import import_source_pack, render_source_packs
+from job_radar.app.handlers.sources import (
     render_source_builder,
     render_source_health_center,
     set_source_status,
     update_source,
     update_source_notes,
 )
-from job_radar.app.handlers.wizard import render_wizard  # noqa: F401
+from job_radar.app.handlers.wizard import render_wizard
+from job_radar.app.state import set_state
+from job_radar.config.env_file import save_api_env
+from job_radar.config.settings import get_settings
+from job_radar.db.client import execute, init_db
+from job_radar.ingestion.runner import run_ingestion
+from job_radar.ingestion.source_store import add_source, mark_manual_checked
+from job_radar.scoring.store import save_rubric
 
 
 def serve(port: int = 8766, open_browser: bool = True) -> None:
@@ -101,8 +95,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/backup/database":
             import zipfile as _zf
+
             from job_radar.notes.store import (
-                export_notes_csv, export_notes_json, export_notes_markdown,
+                export_notes_csv,
+                export_notes_json,
+                export_notes_markdown,
             )
             db_path = get_settings().db_path
             init_db()

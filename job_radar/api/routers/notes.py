@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from job_radar.notes.store import (
-    list_notes, list_pinned_notes, get_note, create_note,
-    update_note, archive_note, soft_delete_note,
+    archive_note,
+    create_note,
+    get_note,
+    list_notes,
+    list_pinned_notes,
+    soft_delete_note,
+    update_note,
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])

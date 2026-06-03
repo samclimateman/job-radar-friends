@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/refresh", tags=["refresh"])

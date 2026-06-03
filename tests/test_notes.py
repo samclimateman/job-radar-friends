@@ -1,6 +1,7 @@
 """Tests for the notes data layer."""
 
 import json
+import time
 
 import pytest
 
@@ -127,7 +128,7 @@ def test_update_note_body():
 def test_update_note_updated_at_changes():
     note = create_note(body="Test")
     original_ts = note["updated_at"]
-    import time; time.sleep(1.01)
+    time.sleep(1.01)
     updated = update_note(note["id"], title="New title")
     assert updated["updated_at"] >= original_ts
 

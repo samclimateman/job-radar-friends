@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pathlib import Path
 
-from job_radar.api.routers import jobs, sources, refresh, notes, applications, blocklist, onboarding
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from job_radar.api.routers import applications, blocklist, jobs, notes, onboarding, refresh, sources
 from job_radar.db.client import init_db
 
 app = FastAPI(title="Job Radar API", version="0.1.0")

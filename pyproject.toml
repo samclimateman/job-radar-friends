@@ -47,4 +47,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "N", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # line length handled separately
+    "RUF001", # UI glyphs and scraped/job text legitimately contain Unicode symbols
+    "RUF002",
+    "RUF003",
+]

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from job_radar.app.common import _esc, _empty_row, _provider, _stats
-from job_radar.app.handlers.jobs import _job_row, _job_cards, _score_label, _explanation
+from job_radar.app.common import _empty_row, _esc, _provider, _stats
+from job_radar.app.handlers.jobs import _explanation, _job_cards, _job_row, _score_label
 from job_radar.app.handlers.sources import _source_row
 from job_radar.app.state import get_state
 from job_radar.config.env_file import load_api_env
@@ -567,8 +567,8 @@ def _strategy_summary(rubric: dict[str, str]) -> str:
 
 def render_rubric_preview(title: str, description: str, location: str) -> str:
     import json
+
     from job_radar.app.common import _page
-    from job_radar.app.handlers.jobs import _explanation, _score_label
     from job_radar.ingestion.models import ScrapedJob
     from job_radar.scoring.deterministic import score_job
     from job_radar.scoring.rubric import ScoringRubric, split_terms

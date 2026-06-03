@@ -10,7 +10,6 @@ from pathlib import Path
 
 from job_radar import __version__
 from job_radar.app.macos import install_app
-from job_radar.app.server import serve
 from job_radar.config.settings import get_settings
 from job_radar.db.client import init_db
 from job_radar.ingestion.runner import run_ingestion
@@ -80,7 +79,9 @@ def cmd_sources_list(args: argparse.Namespace) -> int:
 def cmd_start(args: argparse.Namespace) -> int:
     import threading
     import webbrowser
+
     import uvicorn
+
     from job_radar.app.server import serve as serve_html
 
     init_db()

@@ -4,7 +4,6 @@ Mocks the DB execute call so tests run without a real database and cover
 the scoring branches directly. Mirrors career-ops confidence.py test logic.
 """
 
-import pytest
 
 from job_radar.ingestion.confidence import ConfidenceResult, compute_confidence
 

@@ -12,7 +12,6 @@ from job_radar.ingestion.store import (
     touch_source_jobs,
 )
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _source(tmp_path, monkeypatch) -> StoredSource:

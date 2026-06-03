@@ -48,7 +48,7 @@ def get_stats():
 @router.get("/radar")
 def get_radar():
     new_jobs = execute(
-        f"""SELECT j.id, j.title, j.organization, j.location, j.source_url,
+        """SELECT j.id, j.title, j.organization, j.location, j.source_url,
                j.first_seen_at, COALESCE(js.score, 0) AS strategic_fit_score,
                j.last_seen_at
             FROM jobs j LEFT JOIN job_scores js ON js.job_id = j.id
@@ -57,7 +57,7 @@ def get_radar():
             ORDER BY j.first_seen_at DESC LIMIT 10"""
     )
     reappeared = execute(
-        f"""SELECT j.id, j.title, j.organization, j.location, j.source_url,
+        """SELECT j.id, j.title, j.organization, j.location, j.source_url,
                j.first_seen_at, COALESCE(js.score, 0) AS strategic_fit_score,
                j.last_seen_at
             FROM jobs j LEFT JOIN job_scores js ON js.job_id = j.id
@@ -66,7 +66,7 @@ def get_radar():
             ORDER BY j.last_seen_at DESC LIMIT 5"""
     )
     changed = execute(
-        f"""SELECT j.id, j.title, j.organization, j.location, j.source_url,
+        """SELECT j.id, j.title, j.organization, j.location, j.source_url,
                j.first_seen_at, COALESCE(js.score, 0) AS strategic_fit_score,
                j.last_seen_at
             FROM jobs j LEFT JOIN job_scores js ON js.job_id = j.id

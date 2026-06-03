@@ -8,6 +8,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+import job_radar.ingestion.response_cache as response_cache
 from job_radar.db.client import execute, init_db
 from job_radar.ingestion.source_store import StoredSource
 from job_radar.ingestion.sources.ashby import AshbyScraper
@@ -17,7 +18,6 @@ from job_radar.ingestion.sources.personio import PersonioScraper
 from job_radar.ingestion.sources.rss import RssScraper
 from job_radar.ingestion.sources.smartrecruiters import SmartRecruitersScraper
 from job_radar.ingestion.sources.workable import WorkableScraper
-import job_radar.ingestion.response_cache as response_cache
 from job_radar.ingestion.store import (
     finish_run,
     finish_source_run,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import html
 import json
 
-from job_radar.app.common import _esc, _empty_row, _page
+from job_radar.app.common import _esc, _page
 from job_radar.db.client import execute
 
 
@@ -175,7 +175,7 @@ def _fmt_seen(value: str | None) -> str:
     if not value:
         return "—"
     try:
-        from datetime import date, datetime, timezone
+        from datetime import date, datetime
         d = datetime.fromisoformat(value.replace("Z", "+00:00"))
         today = date.today()
         diff = (today - d.date()).days
