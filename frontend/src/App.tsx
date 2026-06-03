@@ -20,7 +20,8 @@ type SortDir = 'asc' | 'desc'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const APP_VERSION = 'v1.0'
+const CURRENT_VERSION = '0.1.0'
+const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
 
 const JOB_VIEWS = [
   { key: 'best', label: 'Best Fit' },
@@ -155,6 +156,36 @@ function applyFilters(jobs: Job[], search: string, locationFilter: string, block
   })
 }
 
+// ── Update banner ─────────────────────────────────────────────────────────────
+
+function semverGt(a: string, b: string): boolean {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true
+    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false
+  }
+  return false
+}
+
+function UpdateBanner({ version, downloadUrl, onDismiss }: {
+  version: string; downloadUrl: string; onDismiss: () => void
+}) {
+  return (
+    <div className="flex items-center gap-3 px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-sm flex-shrink-0">
+      <span className="text-amber-800 font-medium">Job Radar v{version} is available.</span>
+      <a href={downloadUrl} target="_blank" rel="noreferrer"
+        className="text-amber-900 font-semibold underline underline-offset-2 hover:text-amber-950 transition-colors">
+        Download now ↗
+      </a>
+      <button onClick={onDismiss}
+        className="ml-auto text-amber-500 hover:text-amber-700 text-xs font-medium transition-colors">
+        Dismiss
+      </button>
+    </div>
+  )
+}
+
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 
 function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook }: {
@@ -185,7 +216,7 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
           {stats.last_refresh && (
             <span className="text-slate-400 text-xs">
               refreshed {fmtRefresh(stats.last_refresh)}
-              <span className="ml-2 text-slate-300">{APP_VERSION}</span>
+              <span className="ml-2 text-slate-300">v{CURRENT_VERSION}</span>
             </span>
           )}
         </>
@@ -2291,6 +2322,8 @@ export default function App() {
   const [selectedId, setSelectedId]     = useState<string | null>(null)
   const [refreshing, setRefreshing]     = useState(false)
   const [tab, setTab]                   = useState<AppTab>('jobs')
+  const [updateInfo, setUpdateInfo]     = useState<{ version: string; download_url: string } | null>(null)
+  const [updateDismissed, setUpdateDismissed] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function loadJobs(v = view) {
@@ -2309,6 +2342,10 @@ export default function App() {
       .catch(console.error)
       .finally(() => setOnboardingLoaded(true))
     loadJobs()
+    fetch(VERSION_CHECK_URL)
+      .then(r => r.json())
+      .then(data => { if (semverGt(data.version, CURRENT_VERSION)) setUpdateInfo(data) })
+      .catch(() => {})
   }, [])
 
   useEffect(() => { loadJobs() }, [view])
@@ -2409,6 +2446,10 @@ export default function App() {
         onTab={t => { setTab(t); setSelectedId(null) }}
         onRefresh={handleRefresh} refreshing={refreshing}
         onNotebook={() => { setTab('notebook'); setSelectedId(null) }} />
+      {updateInfo && !updateDismissed && (
+        <UpdateBanner version={updateInfo.version} downloadUrl={updateInfo.download_url}
+          onDismiss={() => setUpdateDismissed(true)} />
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         <div className={`flex-1 ${tab === 'notebook' ? 'overflow-hidden flex' : 'overflow-y-auto'}`}>
