@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 from pathlib import Path
 
 from job_radar import __version__
+from job_radar.app.handlers.export import write_backup_zip
 from job_radar.app.macos import install_app
 from job_radar.config.settings import get_settings
 from job_radar.db.client import init_db
@@ -37,7 +37,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print(f"Python: {sys.version.split()[0]}")
     print(f"Data directory exists: {settings.data_dir.exists()}")
     print(f"SQLite database exists: {db_path.exists()}")
-    print(f"uv available: {bool(shutil.which('uv'))}")
     print("Playwright: deferred for v0.1 core loop")
     return 0
 
@@ -128,10 +127,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 def cmd_backup(args: argparse.Namespace) -> int:
-    settings = get_settings()
     init_db()
-    dest = Path(args.output or f"job-radar-backup-{settings.db_path.stem}.sqlite").resolve()
-    shutil.copy2(settings.db_path, dest)
+    dest = write_backup_zip(Path(args.output) if args.output else None)
     print(f"Backup written: {dest}")
     return 0
 
@@ -163,7 +160,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="Check local runtime")
     doctor.set_defaults(func=cmd_doctor)
 
-    backup = sub.add_parser("backup", help="Back up local SQLite data")
+    backup = sub.add_parser("backup", help="Create a portable backup zip")
     backup.add_argument("--output", help="Backup file path")
     backup.set_defaults(func=cmd_backup)
 

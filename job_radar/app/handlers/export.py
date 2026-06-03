@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import shutil
+import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 from job_radar.app.state import set_state
@@ -36,7 +39,6 @@ def export_jobs_csv() -> str:
 
 
 def export_sources_json() -> str:
-    import json
     rows = execute(
         """
         SELECT s.*, h.last_checked_at, h.last_successful_at, h.jobs_found,
@@ -47,6 +49,44 @@ def export_sources_json() -> str:
         """
     )
     return json.dumps(rows, indent=2)
+
+
+def create_backup_bytes() -> bytes:
+    """Create a portable backup zip containing database and user exports."""
+    from job_radar.notes.store import export_notes_csv, export_notes_json, export_notes_markdown
+
+    db_path = get_settings().db_path
+    init_db()
+    execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
+    metadata = {
+        "app": "job-radar",
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "database_file": db_path.name,
+    }
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("job-radar.sqlite", db_path.read_bytes())
+        zf.writestr("exports/jobs.csv", export_jobs_csv())
+        zf.writestr("exports/sources.json", export_sources_json())
+        zf.writestr("exports/notes.json", export_notes_json())
+        zf.writestr("exports/notes.csv", export_notes_csv())
+        for path, content in export_notes_markdown().items():
+            zf.writestr(f"exports/{path}", content)
+        zf.writestr("metadata.json", json.dumps(metadata, indent=2))
+    return buf.getvalue()
+
+
+def write_backup_zip(output_path: Path | None = None) -> Path:
+    """Write a portable backup zip and return its path."""
+    if output_path is None:
+        ts = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
+        output_path = Path.cwd() / f"job-radar-backup-{ts}.zip"
+    output_path = output_path.expanduser().resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(create_backup_bytes())
+    return output_path
 
 
 def restore_database(backup_path: str) -> bool:

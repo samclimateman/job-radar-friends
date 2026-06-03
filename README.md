@@ -93,7 +93,7 @@ job-radar ingest --source-id <id>  # Ingest a single source
 job-radar sources add <url>        # Add a source by URL
 job-radar sources list
 job-radar detect <url>             # Show platform detection for a URL
-job-radar backup                   # Copy the SQLite database to a backup file
+job-radar backup                   # Create a portable backup zip
 job-radar doctor                   # Check local runtime
 ```
 
@@ -135,11 +135,13 @@ All data is stored in `~/.job-radar/` by default. Override with `JOB_RADAR_DATA_
   .env              Optional API keys if configured manually
 ```
 
-Back up the database from the dashboard (Ranked Jobs → Backup DB) or via CLI:
+Back up the database and user exports from the dashboard (Ranked Jobs → Backup ZIP) or via CLI:
 
 ```bash
 job-radar backup
 ```
+
+The backup zip includes the SQLite database, jobs CSV, sources JSON, notes JSON/CSV/Markdown, and metadata.
 
 ---
 
@@ -180,5 +182,5 @@ Tests do not require network access. All scraper tests use fixtures.
 | Source packs | Alpha (Brussels Policy Pack bundled) |
 | Tauri desktop shell | Beta (ad-hoc signed DMG) |
 | HTTP caching (ETag/Last-Modified) | Planned |
-| Full backup zip (config + CSV) | Planned |
+| Full backup zip (database + jobs/sources/notes exports) | Working |
 | Developer ID notarized DMG | Planned |

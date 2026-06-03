@@ -200,7 +200,7 @@ def render_dashboard(
         <h2>Ranked Jobs</h2>
         <div class="jr-actions">
           <a class="jr-small-link" href="/export/jobs.csv">Export CSV</a>
-          <a class="jr-small-link" href="/backup/database">Backup DB</a>
+          <a class="jr-small-link" href="/backup/database">Backup ZIP</a>
         </div>
       </div>
       <form method="post" action="/backup/restore" class="jr-restore-form">

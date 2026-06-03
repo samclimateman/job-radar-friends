@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,7 +20,12 @@ from job_radar.app.handlers.dashboard import (  # noqa: F401
     render_dashboard,
     render_rubric_preview,
 )
-from job_radar.app.handlers.export import export_jobs_csv, export_sources_json, restore_database
+from job_radar.app.handlers.export import (
+    create_backup_bytes,
+    export_jobs_csv,
+    export_sources_json,
+    restore_database,
+)
 from job_radar.app.handlers.jobs import render_job_detail, update_job_status
 from job_radar.app.handlers.notes import render_note_detail, render_notebook
 from job_radar.app.handlers.source_packs import import_source_pack, render_source_packs
@@ -35,8 +39,7 @@ from job_radar.app.handlers.sources import (
 from job_radar.app.handlers.wizard import render_wizard
 from job_radar.app.state import set_state
 from job_radar.config.env_file import save_api_env
-from job_radar.config.settings import get_settings
-from job_radar.db.client import execute, init_db
+from job_radar.db.client import init_db
 from job_radar.ingestion.runner import run_ingestion
 from job_radar.ingestion.source_store import add_source, mark_manual_checked
 from job_radar.scoring.store import save_rubric
@@ -94,24 +97,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             )
             return
         if parsed.path == "/backup/database":
-            import zipfile as _zf
-
-            from job_radar.notes.store import (
-                export_notes_csv,
-                export_notes_json,
-                export_notes_markdown,
-            )
-            db_path = get_settings().db_path
-            init_db()
-            execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            buf = io.BytesIO()
-            with _zf.ZipFile(buf, "w", _zf.ZIP_DEFLATED) as zf:
-                zf.writestr("job-radar.sqlite", db_path.read_bytes())
-                zf.writestr("notes.json", export_notes_json())
-                zf.writestr("notes.csv", export_notes_csv())
-                for path, content in export_notes_markdown().items():
-                    zf.writestr(path, content)
-            self._send_download("job-radar-backup.zip", "application/zip", buf.getvalue())
+            self._send_download("job-radar-backup.zip", "application/zip", create_backup_bytes())
             return
         if parsed.path == "/wizard":
             params = parse_qs(parsed.query)

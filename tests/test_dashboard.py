@@ -1,3 +1,7 @@
+import json
+import zipfile
+
+from job_radar.app.handlers.export import create_backup_bytes
 from job_radar.app.server import (
     ANTHROPIC_KEYS_URL,
     OLLAMA_DOWNLOAD_URL,
@@ -20,6 +24,7 @@ from job_radar.app.state import get_state, set_state
 from job_radar.config.settings import get_settings
 from job_radar.db.client import execute, init_db
 from job_radar.ingestion.source_store import add_source
+from job_radar.notes.store import create_note
 
 
 def test_dashboard_renders_ai_setup_links(tmp_path, monkeypatch):
@@ -72,6 +77,34 @@ def test_job_detail_and_export_render_stored_job(tmp_path, monkeypatch):
     assert "Description" in detail
     assert "Policy Analyst" in csv_text
     assert "source_url" in csv_text
+    get_settings.cache_clear()
+
+
+def test_backup_zip_contains_database_and_exports(tmp_path, monkeypatch):
+    _seed_job(tmp_path, monkeypatch)
+    create_note(body="Follow up with Acme", title="Acme note", tags=["policy"])
+
+    backup_bytes = create_backup_bytes()
+    backup_path = tmp_path / "backup.zip"
+    backup_path.write_bytes(backup_bytes)
+
+    with zipfile.ZipFile(backup_path) as zf:
+        names = set(zf.namelist())
+        jobs_csv = zf.read("exports/jobs.csv").decode()
+        sources_json = zf.read("exports/sources.json").decode()
+        notes_json = zf.read("exports/notes.json").decode()
+        metadata = json.loads(zf.read("metadata.json"))
+
+    assert "job-radar.sqlite" in names
+    assert "exports/jobs.csv" in names
+    assert "exports/sources.json" in names
+    assert "exports/notes.json" in names
+    assert "exports/notes.csv" in names
+    assert any(name.startswith("exports/notes_markdown/") and name.endswith(".md") for name in names)
+    assert "Policy Analyst" in jobs_csv
+    assert "https://jobs.lever.co/acme" in sources_json
+    assert "Acme note" in notes_json
+    assert metadata["app"] == "job-radar"
     get_settings.cache_clear()
 
 
