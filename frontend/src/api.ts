@@ -113,6 +113,20 @@ export interface RefreshStatus {
   failed: number
 }
 
+export interface RefreshProgress {
+  running: boolean
+  done: boolean
+  jobs_found: number
+  sources: {
+    source_id: string
+    organization: string
+    status: string
+    jobs_found: number
+    new_jobs_found: number
+    error: string | null
+  }[]
+}
+
 export interface Application {
   id: string
   job_id: string
@@ -245,6 +259,7 @@ export const api = {
   deleteSource: (id: string) => del<{ ok: boolean }>(`/sources/${id}`),
   startRefresh: () => post<RefreshStatus>('/refresh/start'),
   refreshStatus: () => get<RefreshStatus>('/refresh/status'),
+  refreshProgress: () => get<RefreshProgress>('/refresh/progress'),
   getBlocklist: () => get<string[]>('/blocklist'),
   addToBlocklist: (phrase: string) => post<string[]>('/blocklist', { phrase }),
   removeFromBlocklist: (phrase: string) => del<string[]>(`/blocklist/${encodeURIComponent(phrase)}`),

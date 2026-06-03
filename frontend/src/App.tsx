@@ -193,12 +193,13 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
   appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void; onSettings: () => void
 }) {
   return (
-    <div className="flex items-center gap-4 px-6 py-3 bg-white border-b border-slate-200 text-sm flex-shrink-0">
+    <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 text-sm flex-shrink-0 min-w-0">
       <button onClick={() => onTab('jobs')}
-        className="font-semibold text-slate-800 flex items-center gap-1.5 mr-1 hover:text-slate-600 transition-colors">
-        <span>📡</span> {appTitle}
+        className="font-semibold text-slate-800 flex items-center gap-1.5 hover:text-slate-600 transition-colors flex-shrink-0 max-w-[160px]">
+        <span>📡</span>
+        <span className="truncate">{appTitle}</span>
       </button>
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
+      <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5 flex-shrink-0">
         {([['jobs', 'Jobs'], ['applied', 'Applied'], ['sources', 'Sources']] as [AppTab, string][]).map(([t, label]) => (
           <button key={t} onClick={() => onTab(t)}
             className={`px-3 py-1 rounded-md text-xs font-medium transition-colors
@@ -207,20 +208,22 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
           </button>
         ))}
       </div>
-      <div className="w-px h-4 bg-slate-200" />
-      {stats ? (
-        <>
-          <span className="text-slate-600"><strong className="text-slate-800">{stats.jobs}</strong> jobs</span>
-          <span className="text-slate-600"><strong className="text-slate-800">{stats.sources}</strong> sources</span>
-          {stats.issues > 0 && <span className="text-amber-600 font-medium">⚠ {stats.issues} issues</span>}
-          {stats.last_refresh && (
-            <span className="text-slate-400 text-xs">
-              refreshed {fmtRefresh(stats.last_refresh)}
-              <span className="ml-2 text-slate-300">v{CURRENT_VERSION}</span>
-            </span>
-          )}
-        </>
-      ) : <span className="text-slate-400 text-xs animate-pulse">Loading…</span>}
+      <div className="w-px h-4 bg-slate-200 flex-shrink-0" />
+      <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+        {stats ? (
+          <>
+            <span className="text-slate-600 flex-shrink-0"><strong className="text-slate-800">{stats.jobs}</strong> jobs</span>
+            <span className="text-slate-600 flex-shrink-0"><strong className="text-slate-800">{stats.sources}</strong> sources</span>
+            {stats.issues > 0 && <span className="text-amber-600 font-medium flex-shrink-0">⚠ {stats.issues} issues</span>}
+            {stats.last_refresh && (
+              <span className="text-slate-400 text-xs truncate">
+                refreshed {fmtRefresh(stats.last_refresh)}
+                <span className="ml-2 text-slate-300">v{CURRENT_VERSION}</span>
+              </span>
+            )}
+          </>
+        ) : <span className="text-slate-400 text-xs animate-pulse">Loading…</span>}
+      </div>
       <div className="ml-auto flex gap-2">
         <button
           onClick={onNotebook}
@@ -1741,6 +1744,55 @@ function parsePastedSources(raw: string): OnboardingSource[] {
     .filter(s => s.organization || s.url)
 }
 
+function ScanProgress({ onDone }: { onDone: (jobsFound: number) => void }) {
+  const [progress, setProgress] = useState<import('./api').RefreshProgress | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    function poll() {
+      api.refreshProgress().then(p => {
+        setProgress(p)
+        if (p.done) {
+          onDone(p.jobs_found)
+        } else {
+          timerRef.current = setTimeout(poll, 2000)
+        }
+      }).catch(() => { timerRef.current = setTimeout(poll, 3000) })
+    }
+    poll()
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [])
+
+  if (!progress) return <p className="text-sm text-slate-400 animate-pulse">Starting scan…</p>
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">
+        {progress.done ? `Scan complete — ${progress.jobs_found} job${progress.jobs_found !== 1 ? 's' : ''} found` : 'Scanning sources…'}
+      </p>
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        {progress.sources.map(s => (
+          <div key={s.source_id} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              s.status === 'done'    ? 'bg-emerald-400' :
+              s.status === 'running' ? 'bg-amber-400 animate-pulse' :
+              s.status === 'error'   ? 'bg-red-400' :
+              'bg-slate-200'
+            }`} />
+            <span className="text-sm text-slate-700 truncate flex-1">{s.organization}</span>
+            <span className="text-xs text-slate-400 flex-shrink-0">
+              {s.status === 'done'    ? `${s.new_jobs_found > 0 ? `+${s.new_jobs_found} new` : `${s.jobs_found} jobs`}` :
+               s.status === 'running' ? 'scanning…' :
+               s.status === 'error'   ? 'failed' :
+               'waiting'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ChipToggle({ label, active, onToggle }: { label: string; active: boolean; onToggle: () => void }) {
   return (
     <button
@@ -1801,6 +1853,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
   const [answers, setAnswers] = useState<OnboardingAnswers>(normalizeOnboardingAnswers(initialState?.answers))
   const [saving, setSaving] = useState(false)
   const [scanStarted, setScanStarted] = useState(false)
+  const [scanDone, setScanDone] = useState(false)
   const [sourceResult, setSourceResult] = useState<number | null>(null)
   const [scannableResult, setScannableResult] = useState<number | null>(null)
   const [reviewResult, setReviewResult] = useState<number | null>(null)
@@ -2196,27 +2249,27 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
           )}
 
           {step === 11 && (
-            <OnboardingScreen title="Onboarding complete.">
-              <p>
-                {scanStarted
-                  ? 'Your first scan is running now.'
-                  : sourceResult !== null && scannableResult === 0
+            <OnboardingScreen title={scanDone ? 'First scan complete.' : scanStarted ? 'Scanning your sources.' : 'Onboarding complete.'}>
+              {!scanStarted && (
+                <p>
+                  {sourceResult !== null && scannableResult === 0
                     ? 'Your sources were saved, but they need manual review before Job Radar can scan them.'
                     : 'Ready to start your first scan.'}
-              </p>
-              <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Sources queued</span><span className="font-semibold text-slate-800">{validSources}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Sources added</span><span className="font-semibold text-slate-800">{sourceResult ?? 'Not started'}</span></div>
-                {sourceResult !== null && (
-                  <>
-                    <div className="flex justify-between"><span className="text-slate-500">Scannable now</span><span className="font-semibold text-slate-800">{scannableResult ?? 0}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Need manual check</span><span className="font-semibold text-amber-700">{reviewResult ?? 0}</span></div>
-                  </>
-                )}
-                <div className="flex justify-between"><span className="text-slate-500">First scan</span><span className="font-semibold text-slate-800">{scanStarted ? 'Running' : sourceResult !== null && scannableResult === 0 ? 'Not started' : 'Ready'}</span></div>
-              </div>
-              {sourceResult !== null && (
-                <div className="flex gap-2">
+                </p>
+              )}
+              {scanStarted && !scanDone && (
+                <ScanProgress onDone={jobsFound => {
+                  setScanDone(true)
+                  setSourceResult(prev => prev ?? jobsFound)
+                }} />
+              )}
+              {scanDone && (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-500">Sources added</span><span className="font-semibold text-slate-800">{sourceResult ?? 0}</span></div>
+                    {scannableResult !== null && <div className="flex justify-between"><span className="text-slate-500">Scannable</span><span className="font-semibold text-slate-800">{scannableResult}</span></div>}
+                    {reviewResult !== null && reviewResult > 0 && <div className="flex justify-between"><span className="text-slate-500">Need manual check</span><span className="font-semibold text-amber-700">{reviewResult}</span></div>}
+                  </div>
                   <button onClick={onViewSources}
                     className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50">
                     View source health
@@ -2231,13 +2284,13 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
 
       <OnboardingFooter
         step={step}
-        canContinue={canContinue && !saving}
-        continueLabel={step === 0 ? 'Start setup' : step === 2 ? "I'm ready" : step === 11 ? (sourceResult !== null ? 'Go to dashboard' : 'Start first scan') : 'Continue'}
+        canContinue={canContinue && !saving && !(step === 11 && scanStarted && !scanDone)}
+        continueLabel={step === 0 ? 'Start setup' : step === 2 ? "I'm ready" : step === 11 ? (scanDone ? 'Go to dashboard' : scanStarted ? 'Scanning…' : 'Start first scan') : 'Continue'}
         onBack={() => step > 0 && go(step - 1)}
         onContinue={() => {
           if (step === 11) {
-            if (sourceResult !== null) onDone()
-            else completeAndScan()
+            if (scanDone) onDone()
+            else if (!scanStarted) completeAndScan()
           } else {
             go(step + 1)
           }
