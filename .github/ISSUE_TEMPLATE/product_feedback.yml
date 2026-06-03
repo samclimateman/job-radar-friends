@@ -1,0 +1,40 @@
+name: Product feedback
+description: Share UX, trust, onboarding, or product-quality feedback from beta testing.
+title: "[Feedback]: "
+labels: ["beta-feedback", "ux"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Product reactions are very useful. Please describe what felt clear, useful, confusing, or untrustworthy.
+  - type: textarea
+    id: tested_flow
+    attributes:
+      label: What did you try?
+      placeholder: "Install -> onboarding -> add 4 sources -> first scan -> backup"
+    validations:
+      required: true
+  - type: textarea
+    id: useful
+    attributes:
+      label: What felt useful?
+  - type: textarea
+    id: confusing
+    attributes:
+      label: What felt confusing?
+  - type: textarea
+    id: trust
+    attributes:
+      label: What made you trust or distrust the app?
+  - type: textarea
+    id: polish
+    attributes:
+      label: What felt least polished?
+  - type: textarea
+    id: weekly
+    attributes:
+      label: What would need to improve before you would use this weekly?
+  - type: textarea
+    id: paid
+    attributes:
+      label: What would need to improve before this felt worth paying for?

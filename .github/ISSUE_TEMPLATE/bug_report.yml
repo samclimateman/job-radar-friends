@@ -1,0 +1,74 @@
+name: Bug report
+description: Report something broken, confusing, or unreliable in the Job Radar beta.
+title: "[Bug]: "
+labels: ["bug", "beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Job Radar. Please avoid posting private API keys, resumes, cover letters, or sensitive personal documents.
+  - type: input
+    id: app_version
+    attributes:
+      label: Job Radar version
+      description: Find this in the app or release name if you know it.
+      placeholder: "0.1.0"
+  - type: input
+    id: macos_version
+    attributes:
+      label: macOS version
+      placeholder: "macOS 14.5"
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Install method
+      options:
+        - DMG from GitHub Release
+        - Source checkout
+        - Other
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to do?
+      placeholder: "I was trying to add my first sources and run a scan."
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+      placeholder: "Describe the exact behavior, error, or confusing moment."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: "What should the app have done or explained?"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Job Radar
+        2. Go to Sources
+        3. Click Refresh
+  - type: textarea
+    id: source_urls
+    attributes:
+      label: Source URLs, if relevant
+      description: Only include public URLs. Redact anything sensitive.
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or extra context
+      description: Drag screenshots here if useful. Redact private data first.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How severe was this?
+      options:
+        - App unusable
+        - Blocks an important workflow
+        - Confusing but I could continue
+        - Small polish issue

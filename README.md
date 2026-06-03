@@ -29,6 +29,10 @@ Download `Job.Radar.dmg`, open it, drag **Job Radar.app** to **Applications**, t
 
 The repo is public so beta users, testers, and future contributors can inspect the project. It is not a SaaS product and does not currently charge users, but product decisions should be judged against the standard of an app someone might eventually pay for as an independent desktop tool.
 
+## Beta feedback
+
+If you are testing Job Radar, please use [BETA_FEEDBACK.md](BETA_FEEDBACK.md) for the most useful test path and copy/paste report format. GitHub issue templates are available for bug reports and product feedback.
+
 ## Developer quick start (macOS)
 
 **Install:**

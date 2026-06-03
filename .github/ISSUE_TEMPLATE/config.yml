@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Beta feedback guide
+    url: https://github.com/samclimateman/job-radar-friends/blob/main/BETA_FEEDBACK.md
+    about: Read what feedback is most useful during the public beta.
