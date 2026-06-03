@@ -76,14 +76,20 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Public release guardrail: `make public-check` runs private-marker scan, Ruff, pytest, and frontend build
 - Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, and frontend metadata, and `make version-bump-patch|minor|major` updates them together
 
+### What changed 2026-06-03
+- Onboarding copy edits: step 0 heading → “Job hunting is mostly terrible.”, “That is why I made Job Radar.”, removed “actually”; step 1 heading → “What should I call you?”; step 2 heading → “Set up takes a few minutes.”
+- Onboarding gate bug fixed: wizard was suppressed whenever `sources > 0`, even if onboarding was never completed. Now gates on `completed` flag only.
+- Frontend rebuilt with both changes.
+- Diagnosed port-conflict banner (old process left on :8766) and stale onboarding state from prior test runs.
+
 ### What's next (prioritised plan)
-1. **Manual human QA from the public beta DMG** — install/open the app like a beta tester would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.
-2. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
-3. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
-4. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
-5. **Polish setup quality model** — make “Partial / Good / Strong” actionable with specific next steps.
-6. **Indie-app polish pass** — tighten copy, empty states, error states, backup/restore confidence, and packaging rough edges until the app feels credible to a paying non-technical user.
-7. **Make production API base dynamic** — same-origin API is now used, but alternate-port package QA still needs careful smoke testing.
+1. **Rebuild and retest DMG** — rebuild the packaged app with the onboarding gate fix and copy edits, then do a clean install test.
+2. **Onboarding step navigation** — make steps visible throughout with clickable jump-to and autosave-as-you-type (user requested).
+3. **Port-conflict handling** — kill stale :8766 process on launch rather than showing a warning banner.
+4. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
+5. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
+6. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
+7. **Indie-app polish pass** — tighten copy, empty states, error states, backup/restore confidence, and packaging rough edges until the app feels credible to a paying non-technical user.
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions

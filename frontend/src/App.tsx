@@ -1771,12 +1771,29 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
   const [reviewResult, setReviewResult] = useState<number | null>(null)
   const [llmPaste, setLlmPaste] = useState('')
   const [copiedPrompt, setCopiedPrompt] = useState(false)
+  const [autoSaving, setAutoSaving] = useState(false)
+  const isFirstRender = useRef(true)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const title = answers.name.trim() ? `${answers.name.trim()}'s Job Radar` : 'Job Radar'
     onTitle(title)
     document.title = title
   }, [answers.name])
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(async () => {
+      setAutoSaving(true)
+      try {
+        await api.saveOnboarding({ last_step: step, partial: true, answers })
+      } finally {
+        setAutoSaving(false)
+      }
+    }, 1500)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+  }, [answers, step])
 
   function setAnswer<K extends keyof OnboardingAnswers>(key: K, value: OnboardingAnswers[K]) {
     setAnswers(prev => ({ ...prev, [key]: value }))
@@ -1860,18 +1877,44 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col font-sans">
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className="flex-1 flex overflow-hidden">
+        <nav className="w-52 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col">
+          <div className="flex-1 overflow-y-auto py-8">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 px-5 mb-2">Setup</p>
+            {ONBOARDING_STEPS.map((label, i) => (
+              <button
+                key={i}
+                onClick={() => go(i)}
+                className={`w-full text-left px-5 py-2 text-xs transition-colors flex items-center gap-2.5
+                  ${i === step
+                    ? 'text-slate-900 font-semibold bg-slate-50 border-l-2 border-slate-800'
+                    : i < step
+                      ? 'text-slate-500 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-700'
+                      : 'text-slate-300 hover:bg-slate-50 border-l-2 border-transparent hover:text-slate-500'}`}
+              >
+                <span className="w-3 flex-shrink-0 text-[10px] text-emerald-500">
+                  {i < step ? '✓' : ''}
+                </span>
+                {label}
+              </button>
+            ))}
+          </div>
+          {autoSaving && (
+            <p className="text-[10px] text-slate-400 px-5 py-3 border-t border-slate-100">Saving…</p>
+          )}
+        </nav>
+        <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-8 py-12">
           {step === 0 && (
-            <OnboardingScreen title="Job hunting is terrible.">
+            <OnboardingScreen title="Job hunting is mostly terrible.">
               <p>Especially when you are looking for something specific.</p>
-              <p>That is why Job Radar exists.</p>
-              <p>It watches the organizations you care about, tracks new roles, and helps you spot the ones actually worth your time.</p>
+              <p>That is why I made Job Radar.</p>
+              <p>It watches the organizations you care about, tracks new roles, and helps you spot the ones worth your time.</p>
             </OnboardingScreen>
           )}
 
           {step === 1 && (
-            <OnboardingScreen title="First things first. What should I call you?">
+            <OnboardingScreen title="What should I call you?">
               <input
                 autoFocus
                 value={answers.name}
@@ -1886,7 +1929,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
           )}
 
           {step === 2 && (
-            <OnboardingScreen title="Good setup takes a few minutes.">
+            <OnboardingScreen title="Set up takes a few minutes.">
               <p>A useful setup takes about 10-15 minutes. A strong setup takes about 30.</p>
               <p>The point is to do the thinking once, so Job Radar can keep watching the right places.</p>
               <div className="grid sm:grid-cols-2 gap-3 pt-2">
@@ -2148,6 +2191,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
             </OnboardingScreen>
           )}
         </div>
+        </div>
       </div>
 
       <OnboardingFooter
@@ -2346,7 +2390,7 @@ export default function App() {
   )
 
   const panelOpen = selectedId !== null && tab === 'jobs'
-  const shouldShowOnboarding = onboardingLoaded && onboarding && !onboarding.completed && stats !== null && stats.sources === 0
+  const shouldShowOnboarding = onboardingLoaded && onboarding !== null && !onboarding.completed
 
   if (shouldShowOnboarding) {
     return (
