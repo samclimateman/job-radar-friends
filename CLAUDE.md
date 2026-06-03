@@ -4,7 +4,9 @@
 
 ## What this is
 
-A universal, distributable version of Job Radar for non-technical users. Packaged as a macOS `.dmg` via Tauri. Users install it like a normal app — no terminal, no Python environment visible. Local SQLite, local Python backend, React/Tailwind dashboard.
+A public beta of the universal, distributable version of Job Radar for non-technical users. Packaged as a macOS `.dmg` via Tauri. Users install it like a normal app — no terminal, no Python environment visible. Local SQLite, local Python backend, React/Tailwind dashboard.
+
+The product benchmark is not "works for friends" anymore. Treat this as an early independent desktop app that should eventually feel good enough for people to pay for: trustworthy install, calm onboarding, reliable scans, transparent source health, useful ranking, backup/export, and no private-data leakage.
 
 Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYSTEM.md). Roadmap and product direction in [ROADMAP_2_0.md](ROADMAP_2_0.md).
 
@@ -74,12 +76,13 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Public release guardrail: `make public-check` runs private-marker scan, Ruff, pytest, and frontend build
 
 ### What's next (prioritised plan)
-1. **Manual human QA from the DMG** — install/open the app like a friend would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.
+1. **Manual human QA from the public beta DMG** — install/open the app like a beta tester would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.
 2. **Settings editor for onboarding answers** — let users revise name, criteria, source review, and strategy after first run from the React UI.
 3. **Live first-scan progress in React** — show source-by-source progress and failures while onboarding scan runs.
 4. **Source packs in React onboarding** — offer curated starter packs without replacing user-entered sources.
 5. **Polish setup quality model** — make “Partial / Good / Strong” actionable with specific next steps.
-6. **Make production API base dynamic** — same-origin API is now used, but alternate-port package QA still needs careful smoke testing.
+6. **Indie-app polish pass** — tighten copy, empty states, error states, backup/restore confidence, and packaging rough edges until the app feels credible to a paying non-technical user.
+7. **Make production API base dynamic** — same-origin API is now used, but alternate-port package QA still needs careful smoke testing.
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions

@@ -2,7 +2,9 @@
 
 ## Product Direction
 
-For 2.0, the goal should be less "add more AI" and more "turn the useful local prototype into a polished desktop product that feels trustworthy, installable, and calm."
+For 2.0, the goal should be less "add more AI" and more "turn the public beta into a polished desktop product that feels trustworthy, installable, and calm."
+
+The benchmark is an independent app someone could eventually pay for, not just a helpful project for friends. It does not need SaaS accounts, cloud sync, or growth-hacking mechanics to meet that bar. It does need packaging, onboarding, scan reliability, source-health transparency, data portability, privacy, and supportable UX to feel serious.
 
 The strongest positioning is:
 
@@ -268,7 +270,7 @@ These make the product harder to trust and harder to ship.
 
 ## Final Judgment
 
-The current app is close to a useful v0.1 alpha for technical friends. The 2.0 leap is not mainly about making it smarter. It is about making it feel safe, reliable, and productized:
+The current app is a public beta of a local-first career radar. The 2.0 leap is not mainly about making it smarter. It is about making it feel safe, reliable, and productized enough that a non-technical user could trust it and, eventually, plausibly pay for it:
 
 1. installable
 2. clear onboarding
@@ -279,4 +281,3 @@ The current app is close to a useful v0.1 alpha for technical friends. The 2.0 l
 7. strong backup/export
 
 That combination makes Job Radar feel like a serious local desktop product without turning it into a bloated SaaS or unreliable AI agent.
-

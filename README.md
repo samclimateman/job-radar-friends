@@ -4,7 +4,7 @@ Local-first career opportunity monitoring for any niche.
 
 Job Radar tracks career pages, stores scraped jobs locally in SQLite, and ranks opportunities against a user-defined search strategy. It does not apply for jobs, generate fabricated listings, or send your data anywhere.
 
-**Alpha — expect rough edges.**
+**Public beta — actively being tested.** The long-term benchmark is a polished local-first indie desktop app that people could reasonably choose to pay for: trustworthy install, calm onboarding, reliable scans, clear source health, useful ranking, and strong backup/export.
 
 ---
 
@@ -19,13 +19,15 @@ Job Radar tracks career pages, stores scraped jobs locally in SQLite, and ranks 
 
 ---
 
-## Download beta (macOS)
+## Download public beta (macOS)
 
-The current friend beta is distributed as a GitHub Release DMG:
+The current public beta is distributed as a GitHub Release DMG:
 
 https://github.com/samclimateman/job-radar-friends/releases
 
 Download `Job.Radar.dmg`, open it, drag **Job Radar.app** to **Applications**, then launch the app. This beta is ad-hoc signed, not Apple Developer ID notarized, so macOS may require right-click → **Open** on first launch.
+
+The repo is public so beta users, testers, and future contributors can inspect the project. It is not a SaaS product and does not currently charge users, but product decisions should be judged against the standard of an app someone might eventually pay for as an independent desktop tool.
 
 ## Developer quick start (macOS)
 
@@ -99,7 +101,7 @@ job-radar doctor                   # Check local runtime
 
 ---
 
-## Desktop app build (macOS, alpha)
+## Desktop app build (macOS, beta)
 
 A Tauri-based desktop wrapper is included. It spawns the Python server and opens the dashboard in a native window.
 
