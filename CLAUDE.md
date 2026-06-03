@@ -93,6 +93,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
+- **Schema changes must be additive** — user databases at `~/.job-radar/job-radar.sqlite` persist across updates; never DROP, RENAME, or retype columns. New columns go in `schema.sql` + `_ensure_columns()` in `db/client.py`. Full rules in SYSTEM.md.
 - Build not notarised — first-launch requires right-click → Open
 - DMG launch was smoke-tested under automation: React shell, onboarding API, onboarding completion with blockers, needs-review source persistence, and blocklist persistence all passed. A full manual double-click/install test is still needed for window lifecycle, first scan with real URLs, and Gatekeeper behavior.
 - Keep `README.md`, `SYSTEM.md`, and `CLAUDE.md` manually aligned after behavior changes; avoid dynamic counts unless they are verified during the session.
