@@ -214,7 +214,7 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
           <>
             <span className="text-slate-600 flex-shrink-0"><strong className="text-slate-800">{stats.jobs}</strong> jobs</span>
             <span className="text-slate-600 flex-shrink-0"><strong className="text-slate-800">{stats.sources}</strong> sources</span>
-            {stats.issues > 0 && <span className="text-amber-600 font-medium flex-shrink-0">⚠ {stats.issues} issues</span>}
+            {stats.issues > 0 && <button onClick={() => onTab('sources')} className="text-amber-600 font-medium flex-shrink-0 hover:text-amber-800 transition-colors">⚠ {stats.issues} issues</button>}
             {stats.last_refresh && (
               <span className="text-slate-400 text-xs truncate">
                 refreshed {fmtRefresh(stats.last_refresh)}
@@ -884,7 +884,15 @@ function SourcesView() {
   }
 
   if (loading) return <div className="flex items-center justify-center py-20 text-sm text-slate-400">Loading…</div>
-  if (!health) return <div className="flex items-center justify-center py-20 text-sm text-slate-400">No source health data yet — run a refresh.</div>
+  if (!health) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3">
+      <p className="text-sm text-slate-400">No scans yet — your sources haven't been checked.</p>
+      <button onClick={() => { api.startRefresh().catch(console.error); setTimeout(loadHealth, 5000) }}
+        className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
+        Run first refresh
+      </button>
+    </div>
+  )
 
   const s = health.summary
   const results = health.results.filter(r =>
@@ -965,6 +973,7 @@ function SourceTable({
   onSave: (sourceId: string) => void
   onAction: (sourceId: string, action: 'checked' | 'disable' | 'enable' | 'retry' | 'delete') => void
 }) {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   if (rows.length === 0) return <p className="text-sm text-slate-400 py-4">None.</p>
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
@@ -1072,10 +1081,23 @@ function SourceTable({
                         </button>
                       )}
                       {r.jobs_found === 0 && (
-                        <button onClick={() => onAction(r.source_id, 'delete')} disabled={busy}
-                          className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40">
-                          Remove
-                        </button>
+                        pendingDeleteId === r.source_id ? (
+                          <div className="flex gap-1">
+                            <button onClick={() => { onAction(r.source_id, 'delete'); setPendingDeleteId(null) }} disabled={busy}
+                              className="text-xs px-2.5 py-1 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 disabled:opacity-40">
+                              Confirm
+                            </button>
+                            <button onClick={() => setPendingDeleteId(null)}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setPendingDeleteId(r.source_id)} disabled={busy}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40">
+                            Remove
+                          </button>
+                        )
                       )}
                     </div>
                   )}
@@ -1347,6 +1369,7 @@ function NotebookView() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
+  const [saveError, setSaveError]   = useState(false)
   const [editTitle, setEditTitle]   = useState('')
   const [editBody, setEditBody]     = useState('')
   const [editType, setEditType]     = useState('general')
@@ -1371,13 +1394,14 @@ function NotebookView() {
   function scheduleSave(id: string, title: string, body: string, type: string) {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setSaving(true)
+    setSaveError(false)
     saveTimer.current = setTimeout(() => {
       api.updateNote(id, { title, body_markdown: body, note_type: type })
         .then(updated => {
           setNotes(prev => prev.map(n => n.id === id ? updated : n))
           setSaving(false)
         })
-        .catch(() => setSaving(false))
+        .catch(() => { setSaving(false); setSaveError(true) })
     }, 800)
   }
 
@@ -1450,7 +1474,7 @@ function NotebookView() {
         <div className="flex-1 overflow-y-auto">
           {loading && <p className="text-xs text-slate-400 text-center py-6">Loading…</p>}
           {!loading && filtered.length === 0 && (
-            <p className="text-xs text-slate-400 text-center py-6 italic">No notes yet.</p>
+            <p className="text-xs text-slate-400 text-center py-6">Nothing here yet — create your first note above.</p>
           )}
           {pinned.length > 0 && (
             <div className="px-2 pt-3 pb-1">
@@ -1472,9 +1496,10 @@ function NotebookView() {
         {!selected ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">
             <div className="text-center">
-              <p className="text-sm font-medium">Select a note or create one</p>
+              <p className="text-sm font-medium text-slate-500">Your notes live here</p>
+              <p className="text-xs text-slate-400 mt-1 mb-3">Track ideas, roles you're watching, contacts, or anything else.</p>
               <button onClick={handleNewNote}
-                className="mt-3 text-xs text-sky-600 hover:text-sky-800 font-medium transition-colors">
+                className="text-xs px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-colors">
                 + New note
               </button>
             </div>
@@ -1488,6 +1513,7 @@ function NotebookView() {
               </select>
               <div className="ml-auto flex items-center gap-2">
                 {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
+                {!saving && saveError && <span className="text-xs text-red-500 font-medium">Could not save — check your connection</span>}
                 <button onClick={() => handlePin(selected)}
                   title={selected.pinned ? 'Unpin' : 'Pin'}
                   className={`text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium
@@ -2488,10 +2514,11 @@ function SettingsView({ onboarding, onSaved }: { onboarding: OnboardingState | n
   )
 }
 
-function SetupQualityBanner({ onboarding, stats, refreshing }: {
+function SetupQualityBanner({ onboarding, stats, refreshing, onGoToSources }: {
   onboarding: OnboardingState | null
   stats: Stats | null
   refreshing: boolean
+  onGoToSources: () => void
 }) {
   if (!onboarding?.completed) return null
   const answers = onboarding.answers
@@ -2503,7 +2530,7 @@ function SetupQualityBanner({ onboarding, stats, refreshing }: {
   const quality =
     sources.length >= 10 && verified >= 5 && blockConfigured && strategyConfigured ? 'Strong'
     : sources.length >= 5 && strategyConfigured ? 'Good'
-    : 'Partial'
+    : 'Getting started'
   const qualityClass =
     quality === 'Strong' ? 'text-emerald-700 bg-emerald-100'
     : quality === 'Good' ? 'text-sky-700 bg-sky-100'
@@ -2513,13 +2540,17 @@ function SetupQualityBanner({ onboarding, stats, refreshing }: {
     <div className="mx-6 mt-5 rounded-xl border border-slate-200 bg-white px-5 py-4">
       <div className="flex items-center gap-3 flex-wrap">
         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${qualityClass}`}>
-          Radar setup: {quality}
+          Radar: {quality}
         </span>
         <span className="text-xs text-slate-500"><strong className="text-slate-800">{sources.length}</strong> sources added</span>
         <span className="text-xs text-slate-500"><strong className="text-slate-800">{verified}</strong> verified</span>
-        {unchecked > 0 && <span className="text-xs text-amber-600"><strong>{unchecked}</strong> need manual check</span>}
-        <span className="text-xs text-slate-500">{blockConfigured ? 'Block filters configured' : 'No block filters yet'}</span>
-        <span className="text-xs text-slate-500">{refreshing ? 'First scan running' : stats?.last_refresh ? 'Scan history available' : 'Ready to scan'}</span>
+        {unchecked > 0 && (
+          <button onClick={onGoToSources} className="text-xs text-amber-600 hover:text-amber-800 transition-colors">
+            <strong>{unchecked}</strong> need manual check →
+          </button>
+        )}
+        <span className="text-xs text-slate-500">{blockConfigured ? 'Block filters on' : 'No block filters'}</span>
+        <span className="text-xs text-slate-500">{refreshing ? 'Scanning…' : stats?.last_refresh ? `Last scan ${new Date(stats.last_refresh).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'Not yet scanned'}</span>
       </div>
     </div>
   )
@@ -2545,6 +2576,9 @@ export default function App() {
   const [tab, setTab]                   = useState<AppTab>('jobs')
   const [updateInfo, setUpdateInfo]     = useState<{ version: string; download_url: string } | null>(null)
   const [updateDismissed, setUpdateDismissed] = useState(false)
+  const [undoJob, setUndoJob]           = useState<{ id: string; title: string } | null>(null)
+  const [serverError, setServerError]   = useState(false)
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function loadJobs(v = view) {
@@ -2552,7 +2586,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    api.stats().then(setStats).catch(console.error)
+    api.stats().then(setStats).catch(() => setServerError(true))
     api.radar().then(setRadar).catch(console.error)
     api.getBlocklist().then(setBlocklist).catch(console.error)
     api.onboarding()
@@ -2610,9 +2644,22 @@ export default function App() {
   }
 
   function handleDismiss(id: string) {
+    const job = jobs.find(j => j.id === id)
     api.updateStatus(id, 'archived').then(() => {
       setJobs(prev => prev.filter(j => j.id !== id))
       if (selectedId === id) setSelectedId(null)
+      if (undoTimer.current) clearTimeout(undoTimer.current)
+      setUndoJob(job ? { id, title: job.title } : null)
+      undoTimer.current = setTimeout(() => setUndoJob(null), 5000)
+    }).catch(console.error)
+  }
+
+  function handleUndoDismiss() {
+    if (!undoJob) return
+    api.updateStatus(undoJob.id, 'discovered').then(() => {
+      setUndoJob(null)
+      if (undoTimer.current) clearTimeout(undoTimer.current)
+      loadJobs()
     }).catch(console.error)
   }
 
@@ -2668,9 +2715,21 @@ export default function App() {
         onRefresh={handleRefresh} refreshing={refreshing}
         onNotebook={() => { setTab('notebook'); setSelectedId(null) }}
         onSettings={() => { setTab('settings'); setSelectedId(null) }} />
+      {serverError && (
+        <div className="flex items-center gap-3 px-6 py-2.5 bg-red-50 border-b border-red-200 text-sm flex-shrink-0">
+          <span className="text-red-700 font-medium">Job Radar can't reach its backend. Try restarting the app.</span>
+          <button onClick={() => window.location.reload()} className="ml-auto text-red-600 hover:text-red-800 text-xs font-medium transition-colors">Reload</button>
+        </div>
+      )}
       {updateInfo && !updateDismissed && (
         <UpdateBanner version={updateInfo.version} downloadUrl={updateInfo.download_url}
           onDismiss={() => setUpdateDismissed(true)} />
+      )}
+      {undoJob && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-800 text-white text-sm px-5 py-3 rounded-xl shadow-lg">
+          <span className="truncate max-w-[260px]">"{undoJob.title}" hidden</span>
+          <button onClick={handleUndoDismiss} className="text-sky-300 hover:text-sky-100 font-semibold transition-colors flex-shrink-0">Undo</button>
+        </div>
       )}
 
       <div className="flex flex-1 overflow-hidden">
@@ -2689,7 +2748,7 @@ export default function App() {
                   </a>
                 </div>
               )}
-              <SetupQualityBanner onboarding={onboarding} stats={stats} refreshing={refreshing} />
+              <SetupQualityBanner onboarding={onboarding} stats={stats} refreshing={refreshing} onGoToSources={() => setTab('sources')} />
               <RadarPanel radar={radar} selectedId={selectedId} onSelectJob={id => { setSelectedId(id); setTab('jobs') }}
                 onLocationFilter={handleLocationFilter} />
 
@@ -2753,8 +2812,15 @@ export default function App() {
                     </thead>
                     <tbody>
                       {filtered.length === 0
-                        ? <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
-                            {search || locationFilter ? 'No results for current filters.' : 'No jobs in this view.'}
+                        ? <tr><td colSpan={7} className="px-4 py-12 text-center">
+                            <p className="text-sm text-slate-400">
+                              {search || locationFilter ? 'No results for current filters.' : 'No jobs in this view.'}
+                            </p>
+                            {!search && !locationFilter && (
+                              <p className="text-xs text-slate-300 mt-1">
+                                {view === 'best' ? 'Run a refresh to scan your sources, or add sources in Settings.' : 'Try a different view or run a refresh.'}
+                              </p>
+                            )}
                           </td></tr>
                         : filtered.map(j => (
                           <JobRow key={j.id} job={j} selected={j.id === selectedId}
