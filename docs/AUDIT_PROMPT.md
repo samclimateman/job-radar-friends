@@ -36,6 +36,9 @@ Current known state:
 Your job:
 Audit the repository and produce a prioritized improvement plan, then implement the highest-leverage fixes that are safe and scoped.
 
+Red-team posture:
+Do not assume the happy path. Try to break the product, confuse the user, leak private data, corrupt local state, and produce misleading confidence. Treat "it passed tests" as useful evidence, not proof. Prefer concrete reproduction steps and file references over broad impressions.
+
 Focus areas:
 
 1. UX excellence
@@ -47,6 +50,11 @@ Focus areas:
 - Are destructive actions guarded and reversible where appropriate?
 - Are the Jobs, Sources, Applied, and Notebook surfaces coherent as one product?
 - Does the UI feel like a serious desktop app rather than an internal admin panel?
+- Walk through at least three concrete user journeys:
+  - fresh install -> onboarding -> first scan -> first useful job decision
+  - source breaks or needs manual watch -> user understands and can act
+  - backup/export -> user trusts they can move or recover their data
+- Look for trust killers: dead buttons, unclear saves, silent failures, unexplained scores, stale data that looks fresh, hidden scan errors, confusing beta/install copy, and irreversible actions that feel casual.
 
 2. Backend quality and reliability
 - Check database initialization, migrations, idempotency, and fresh-install behavior.
@@ -58,6 +66,14 @@ Focus areas:
 - Check concurrency around browser scrapers and HTTP scrapers.
 - Check package/build behavior for app bundle, sidecar, frontend assets, and local user-data paths.
 - Check tests for meaningful coverage around onboarding, backup/restore, source actions, scoring, lifecycle, and packaging-sensitive paths.
+- Try to identify ways local state could become inconsistent:
+  - interrupted scan
+  - duplicate source
+  - changed source URL/platform
+  - restore over an existing database
+  - partial migration
+  - frontend retry after backend timeout
+- Confirm failures are observable to the user and recoverable without opening a terminal.
 
 3. Security, privacy, and public-release hygiene
 - Confirm the repo contains no private names, paths, source lists, notes, resumes, applications, API keys, local databases, screenshots, or personal job-search data.
@@ -68,6 +84,14 @@ Focus areas:
 - Check whether untrusted scraped HTML or user-entered content can be rendered unsafely.
 - Check that optional LLM/prompt flows do not require API keys, do not send data silently, and are clear to the user.
 - Check that logs avoid leaking private user data unnecessarily.
+- Actively test or reason through abuse cases:
+  - malicious source URL or feed content
+  - HTML/JS inside job titles, descriptions, notes, source names, or organization names
+  - backup/restore archive containing unexpected paths or filenames
+  - localhost API accessed by another local page or process
+  - oversized feeds, huge descriptions, many sources, or malformed RSS/XML/JSON
+  - symlink, path traversal, and overwrite attempts around backup/restore/import/export
+- Check whether any public-release artifact could accidentally include local databases, caches, logs, source packs from private repos, screenshots, or generated user data.
 
 4. Packaging and release quality
 - Does the DMG/app experience feel credible for a public beta?
@@ -76,6 +100,9 @@ Focus areas:
 - Are ad-hoc signing and non-notarized first-launch limitations explained honestly?
 - Are generated artifacts, local data, caches, and runtime files ignored appropriately?
 - Are docs aligned with the actual Tauri/FastAPI/React/SQLite app architecture?
+- Check that version bumps are deliberate, synchronized, and not implied by ordinary pushes.
+- Check whether the app can be built from a fresh clone using documented commands.
+- Identify anything that would make a beta tester doubt the app: scary install warnings with no explanation, terminal windows, broken icons, stale docs, confusing release assets, or missing recovery guidance.
 
 5. Product strategy fit
 - Prefer local-first, privacy-preserving, reliable product work over flashy AI.
@@ -90,6 +117,14 @@ Required output:
 4. A scoped implementation plan.
 5. Implement the top safe fixes if you have repo access.
 6. Run relevant checks. At minimum, run `make version-check`; for public-release-impacting changes, run `make public-check`.
+
+Evidence standard:
+- Findings must include file paths and, where possible, exact lines or functions.
+- For each security/privacy issue, include impact, exploit path, and a safe fix.
+- For each UX issue, name the affected user journey and the trust/clarity problem.
+- For each backend issue, state whether it risks data loss, stale results, broken scans, misleading ranking, or unrecoverable user state.
+- If you cannot verify something, say what would be required to verify it.
+- Do not count "tests pass" as a finding. Use tests to support or challenge findings.
 
 Do not:
 - Turn this into SaaS.
