@@ -1,4 +1,6 @@
-from job_radar.ingestion.source_detection import detect_source
+import pytest
+
+from job_radar.ingestion.source_detection import SourceUrlError, detect_source, normalize_source_url
 
 
 def test_detects_greenhouse_board():
@@ -58,3 +60,23 @@ def test_unknown_degrades_to_static_html_review():
     assert detection.platform == "generic_static"
     assert detection.parser_type == "static_html"
     assert detection.manual_review_needed is True
+
+
+def test_source_url_normalizes_bare_domains():
+    assert normalize_source_url("jobs.lever.co/acme") == "https://jobs.lever.co/acme"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "file:///tmp/jobs.xml",
+        "ftp://example.org/jobs.xml",
+        "http://localhost:8766/feed.xml",
+        "http://127.0.0.1/feed.xml",
+        "http://10.0.0.1/feed.xml",
+        "https://user:pass@example.org/jobs",
+    ],
+)
+def test_source_url_rejects_unsafe_inputs(url):
+    with pytest.raises(SourceUrlError):
+        normalize_source_url(url)

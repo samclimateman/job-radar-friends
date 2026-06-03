@@ -17,6 +17,16 @@ def test_add_source_persists_detected_platform(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_add_source_normalizes_bare_domain(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+
+    source = add_source("jobs.lever.co/acme", organization="Acme")
+
+    assert source.url == "https://jobs.lever.co/acme"
+    get_settings.cache_clear()
+
+
 def test_add_unknown_source_marks_needs_review(tmp_path, monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))

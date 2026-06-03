@@ -166,6 +166,24 @@ def test_restore_database_from_backup_path(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_restore_database_from_backup_zip(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "live"))
+    init_db()
+    source = add_source("https://jobs.lever.co/acme", organization="Acme")
+    backup_path = tmp_path / "backup.zip"
+    backup_path.write_bytes(create_backup_bytes())
+
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "restored"))
+    get_settings.cache_clear()
+
+    assert restore_database(str(backup_path)) is True
+    rows = execute("SELECT url FROM sources WHERE id = ?", (source.id,))
+    assert rows[0]["url"] == "https://jobs.lever.co/acme"
+    assert get_state("last_restore_error", "") == ""
+    get_settings.cache_clear()
+
+
 def test_source_health_center_and_source_actions(tmp_path, monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
