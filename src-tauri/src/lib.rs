@@ -75,6 +75,24 @@ fn find_sidecar() -> Option<std::path::PathBuf> {
     None
 }
 
+/// Kill any process occupying the given port so we can bind it cleanly.
+fn kill_port(port: u16) {
+    let Ok(output) = std::process::Command::new("lsof")
+        .args(["-ti", &format!(":{}", port)])
+        .output()
+    else {
+        return;
+    };
+    let pids = String::from_utf8_lossy(&output.stdout);
+    for pid_str in pids.split_whitespace() {
+        let _ = std::process::Command::new("kill")
+            .args(["-9", pid_str])
+            .output();
+    }
+    // Give the OS a moment to release the port.
+    std::thread::sleep(std::time::Duration::from_millis(400));
+}
+
 /// Start the bundled job-radar server sidecar.
 ///
 /// The sidecar is a PyInstaller-compiled `job-radar start --no-open` binary.
@@ -90,12 +108,9 @@ fn start_server() -> (Option<std::process::Child>, Vec<String>) {
     let log_path = log_dir.join("startup.log");
 
     if is_port_open(PORT) {
-        let msg = format!(
-            "Port {} is already in use by another local process. Close it and reopen Job Radar.",
-            PORT
-        );
-        let _ = std::fs::write(&log_path, format!("[ERROR] {}\n", msg));
-        return (None, vec![msg]);
+        // Something else is on the port — clear it and start fresh.
+        let _ = std::fs::write(&log_path, format!("[INFO] Port {} in use; killing stale process.\n", PORT));
+        kill_port(PORT);
     }
 
     let Some(sidecar) = find_sidecar() else {
