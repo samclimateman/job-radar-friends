@@ -156,6 +156,7 @@ export interface Note {
   archived: boolean
   created_at: string
   updated_at: string
+  deleted_at: string | null
 }
 
 export interface OnboardingSource {
@@ -270,6 +271,7 @@ export const api = {
     patch<{ ok: boolean }>(`/applications/${id}/outcome`, { outcome, notes: notes ?? null }),
   notes: (note_type?: string) =>
     get<Note[]>('/notes', note_type ? { note_type } : undefined),
+  trashNotes: () => get<Note[]>('/notes/trash'),
   pinnedNotes: () => get<Note[]>('/notes/pinned'),
   createNote: (body: string, title?: string, note_type?: string) =>
     post<Note>('/notes', { body, title: title ?? null, note_type: note_type ?? 'general' }),
@@ -277,6 +279,7 @@ export const api = {
     patch<Note>(`/notes/${id}`, patch_data),
   archiveNote: (id: string) => post<{ ok: boolean }>(`/notes/${id}/archive`),
   deleteNote: (id: string) => del<{ ok: boolean }>(`/notes/${id}`),
+  restoreNote: (id: string) => post<{ ok: boolean }>(`/notes/${id}/restore`),
   onboarding: () => get<OnboardingState>('/onboarding'),
   saveOnboarding: (state: Partial<Pick<OnboardingState, 'partial' | 'last_step' | 'answers'>>) =>
     patch<OnboardingState>('/onboarding', state),

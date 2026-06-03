@@ -1375,11 +1375,19 @@ function NotebookView() {
   const [editType, setEditType]     = useState('general')
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch]         = useState('')
+  const [checked, setChecked]       = useState<Set<string>>(new Set())
+  const [trashMode, setTrashMode]   = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    api.notes().then(n => { setNotes(n); setLoading(false) }).catch(() => setLoading(false))
-  }, [])
+    setLoading(true)
+    setSelectedId(null)
+    setChecked(new Set())
+    const load = trashMode ? api.trashNotes() : api.notes()
+    load.then(n => { setNotes(n); setLoading(false) }).catch(() => setLoading(false))
+  }, [trashMode])
 
   const selected = notes.find(n => n.id === selectedId) ?? null
 
@@ -1434,9 +1442,69 @@ function NotebookView() {
   }
 
   function handleArchive(note: Note) {
+    if (trashMode) return
     api.archiveNote(note.id).then(() => {
       setNotes(prev => prev.filter(n => n.id !== note.id))
       if (selectedId === note.id) setSelectedId(null)
+    }).catch(console.error)
+  }
+
+  function handleDelete(note: Note) {
+    if (trashMode) return
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      if (deleteTimer.current) clearTimeout(deleteTimer.current)
+      deleteTimer.current = setTimeout(() => setDeleteConfirm(false), 3000)
+      return
+    }
+    setDeleteConfirm(false)
+    api.deleteNote(note.id).then(() => {
+      setNotes(prev => prev.filter(n => n.id !== note.id))
+      if (selectedId === note.id) setSelectedId(null)
+    }).catch(console.error)
+  }
+
+  function handleRestore(note: Note) {
+    api.restoreNote(note.id).then(() => {
+      setNotes(prev => prev.filter(n => n.id !== note.id))
+      if (selectedId === note.id) setSelectedId(null)
+    }).catch(console.error)
+  }
+
+  function handleCheck(id: string, v: boolean) {
+    setChecked(prev => {
+      const next = new Set(prev)
+      v ? next.add(id) : next.delete(id)
+      return next
+    })
+  }
+
+  function handleArchiveSelected() {
+    if (trashMode) return
+    const ids = [...checked]
+    Promise.all(ids.map(id => api.archiveNote(id))).then(() => {
+      setNotes(prev => prev.filter(n => !ids.includes(n.id)))
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+      setChecked(new Set())
+    }).catch(console.error)
+  }
+
+  function handleDeleteSelected() {
+    if (trashMode) return
+    const ids = [...checked]
+    Promise.all(ids.map(id => api.deleteNote(id))).then(() => {
+      setNotes(prev => prev.filter(n => !ids.includes(n.id)))
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+      setChecked(new Set())
+    }).catch(console.error)
+  }
+
+  function handleRestoreSelected() {
+    const ids = [...checked]
+    Promise.all(ids.map(id => api.restoreNote(id))).then(() => {
+      setNotes(prev => prev.filter(n => !ids.includes(n.id)))
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+      setChecked(new Set())
     }).catch(console.error)
   }
 
@@ -1457,7 +1525,17 @@ function NotebookView() {
       {/* Sidebar */}
       <div className="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col">
         <div className="px-3 py-3 border-b border-slate-100 flex flex-col gap-2">
-          <button onClick={handleNewNote}
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+            <button onClick={() => setTrashMode(false)}
+              className={`px-2 py-1.5 rounded-md text-xs font-semibold transition-colors ${!trashMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              Notes
+            </button>
+            <button onClick={() => setTrashMode(true)}
+              className={`px-2 py-1.5 rounded-md text-xs font-semibold transition-colors ${trashMode ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              Trash
+            </button>
+          </div>
+          <button onClick={handleNewNote} disabled={trashMode}
             className="w-full px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
             + New note
           </button>
@@ -1474,21 +1552,48 @@ function NotebookView() {
         <div className="flex-1 overflow-y-auto">
           {loading && <p className="text-xs text-slate-400 text-center py-6">Loading…</p>}
           {!loading && filtered.length === 0 && (
-            <p className="text-xs text-slate-400 text-center py-6">Nothing here yet — create your first note above.</p>
+            <p className="text-xs text-slate-400 text-center py-6">
+              {trashMode ? 'Trash is empty.' : 'Nothing here yet — create your first note above.'}
+            </p>
           )}
           {pinned.length > 0 && (
             <div className="px-2 pt-3 pb-1">
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1">Pinned</p>
-              {pinned.map(n => <NoteListItem key={n.id} note={n} selected={n.id === selectedId} onClick={() => setSelectedId(n.id)} />)}
+              {pinned.map(n => <NoteListItem key={n.id} note={n} selected={n.id === selectedId} checked={checked.has(n.id)} onClick={() => setSelectedId(n.id)} onCheck={handleCheck} />)}
             </div>
           )}
           {unpinned.length > 0 && (
             <div className="px-2 pt-3 pb-2">
               {pinned.length > 0 && <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1 mb-1">Notes</p>}
-              {unpinned.map(n => <NoteListItem key={n.id} note={n} selected={n.id === selectedId} onClick={() => setSelectedId(n.id)} />)}
+              {unpinned.map(n => <NoteListItem key={n.id} note={n} selected={n.id === selectedId} checked={checked.has(n.id)} onClick={() => setSelectedId(n.id)} onCheck={handleCheck} />)}
             </div>
           )}
         </div>
+
+        {checked.size > 0 && (
+          <div className="border-t border-slate-200 px-3 py-2 flex items-center gap-2 bg-white">
+            <span className="text-xs text-slate-500 mr-auto">{checked.size} selected</span>
+            {trashMode ? (
+              <button onClick={handleRestoreSelected}
+                className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors">
+                Restore
+              </button>
+            ) : (
+              <>
+                <button onClick={handleArchiveSelected}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-700 transition-colors">
+                  Archive
+                </button>
+                <button onClick={handleDeleteSelected}
+                  className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                  Delete
+                </button>
+              </>
+            )}
+            <button onClick={() => setChecked(new Set())}
+              className="text-xs text-slate-400 hover:text-slate-600 px-1">x</button>
+          </div>
+        )}
       </div>
 
       {/* Editor */}
@@ -1496,24 +1601,37 @@ function NotebookView() {
         {!selected ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">
             <div className="text-center">
-              <p className="text-sm font-medium text-slate-500">Your notes live here</p>
-              <p className="text-xs text-slate-400 mt-1 mb-3">Track ideas, roles you're watching, contacts, or anything else.</p>
-              <button onClick={handleNewNote}
-                className="text-xs px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-colors">
-                + New note
-              </button>
+              <p className="text-sm font-medium text-slate-500">
+                {trashMode ? 'Deleted notes live here' : 'Your notes live here'}
+              </p>
+              <p className="text-xs text-slate-400 mt-1 mb-3">
+                {trashMode ? 'Restore a note to move it back into the notebook.' : "Track ideas, roles you're watching, contacts, or anything else."}
+              </p>
+              {!trashMode && (
+                <button onClick={handleNewNote}
+                  className="text-xs px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-colors">
+                  + New note
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <>
             <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-slate-200">
-              <select value={editType} onChange={e => handleTypeChange(e.target.value)}
+              <select value={editType} onChange={e => handleTypeChange(e.target.value)} disabled={trashMode}
                 className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-sky-200 text-slate-600">
                 {NOTE_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
               </select>
               <div className="ml-auto flex items-center gap-2">
                 {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
                 {!saving && saveError && <span className="text-xs text-red-500 font-medium">Could not save — check your connection</span>}
+                {trashMode ? (
+                  <button onClick={() => handleRestore(selected)}
+                    className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors font-medium">
+                    Restore
+                  </button>
+                ) : (
+                  <>
                 <button onClick={() => handlePin(selected)}
                   title={selected.pinned ? 'Unpin' : 'Pin'}
                   className={`text-xs px-2.5 py-1 rounded-lg border transition-colors font-medium
@@ -1524,6 +1642,13 @@ function NotebookView() {
                   className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-400 hover:border-red-200 hover:text-red-500 transition-colors">
                   Archive
                 </button>
+                <button onClick={() => handleDelete(selected)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-colors
+                    ${deleteConfirm ? 'border-red-300 bg-red-50 text-red-600' : 'border-slate-200 text-slate-400 hover:border-red-200 hover:text-red-500'}`}>
+                  {deleteConfirm ? 'Confirm delete' : 'Delete'}
+                </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex-1 flex flex-col overflow-hidden px-6 pt-5 pb-4">
@@ -1537,6 +1662,7 @@ function NotebookView() {
                   }
                 }}
                 placeholder="Note title…"
+                readOnly={trashMode}
                 className="text-xl font-semibold text-slate-800 bg-transparent border-none outline-none placeholder:text-slate-300 mb-2 w-full"
               />
               <div className="flex items-center gap-1 mb-3 border-b border-slate-100 pb-2">
@@ -1574,6 +1700,7 @@ function NotebookView() {
                 onKeyDown={e => handleNoteBodyKeyDown(e, editBody, v => {
                   handleBodyChange(v)
                 })}
+                readOnly={trashMode}
                 className="flex-1 text-sm text-slate-700 bg-transparent border-none outline-none resize-none leading-relaxed"
               />
             </div>
@@ -1584,21 +1711,38 @@ function NotebookView() {
   )
 }
 
-function NoteListItem({ note, selected, onClick }: { note: Note; selected: boolean; onClick: () => void }) {
+function NoteListItem({ note, selected, checked, onClick, onCheck }: {
+  note: Note; selected: boolean; checked: boolean
+  onClick: () => void; onCheck: (id: string, v: boolean) => void
+}) {
   return (
-    <button onClick={onClick}
-      className={`w-full text-left px-2 py-2 rounded-lg mb-0.5 transition-colors
-        ${selected ? 'bg-sky-50 shadow-[inset_2px_0_0_#38bdf8]' : 'hover:bg-slate-50'}`}>
-      <p className={`text-xs font-medium truncate ${selected ? 'text-slate-900' : 'text-slate-700'}`}>
-        {note.title || <span className="italic text-slate-400">Untitled</span>}
-      </p>
-      <div className="flex items-center gap-1.5 mt-0.5">
-        <span className={`text-[10px] px-1.5 py-0 rounded font-medium ${noteTypeColor(note.note_type)}`}>
-          {note.note_type}
-        </span>
-        <span className="text-[10px] text-slate-400 truncate">{fmtNoteDate(note.updated_at)}</span>
+    <div className={`group relative flex items-start rounded-lg mb-0.5 transition-colors
+      ${selected ? 'bg-sky-50 shadow-[inset_2px_0_0_#38bdf8]' : 'hover:bg-slate-50'}
+      ${checked ? 'bg-slate-100' : ''}`}>
+      <div
+        className={`absolute left-1 top-2.5 transition-opacity ${checked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+        onClick={e => { e.stopPropagation(); onCheck(note.id, !checked) }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          readOnly
+          className="w-3 h-3 rounded cursor-pointer accent-slate-600"
+        />
       </div>
-    </button>
+      <button onClick={onClick}
+        className={`flex-1 text-left py-2 pr-2 rounded-lg transition-colors ${checked ? 'pl-5' : 'pl-2 group-hover:pl-5'}`}>
+        <p className={`text-xs font-medium truncate ${selected ? 'text-slate-900' : 'text-slate-700'}`}>
+          {note.title || <span className="italic text-slate-400">Untitled</span>}
+        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className={`text-[10px] px-1.5 py-0 rounded font-medium ${noteTypeColor(note.note_type)}`}>
+            {note.note_type}
+          </span>
+          <span className="text-[10px] text-slate-400 truncate">{fmtNoteDate(note.updated_at)}</span>
+        </div>
+      </button>
+    </div>
   )
 }
 

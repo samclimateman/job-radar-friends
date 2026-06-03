@@ -14,10 +14,12 @@ from job_radar.notes.store import (
     export_notes_json,
     export_notes_markdown,
     get_note,
+    list_deleted_notes,
     list_notes,
     list_notes_for_entity,
     list_pinned_notes,
     list_recent_notes,
+    restore_note,
     search_notes,
     soft_delete_note,
     update_note,
@@ -178,6 +180,24 @@ def test_soft_delete_hides_from_all_queries():
     assert get_note(note["id"]) is None
     assert all(n["id"] != note["id"] for n in list_notes())
     assert all(n["id"] != note["id"] for n in list_notes(archived=True))
+
+
+def test_soft_deleted_notes_appear_in_trash():
+    active = create_note(body="Keep me")
+    deleted = create_note(body="Trash me")
+    soft_delete_note(deleted["id"])
+    trash_ids = [n["id"] for n in list_deleted_notes()]
+    assert deleted["id"] in trash_ids
+    assert active["id"] not in trash_ids
+
+
+def test_restore_note_returns_note_to_active_list():
+    note = create_note(body="Restore me")
+    soft_delete_note(note["id"])
+    restore_note(note["id"])
+    assert get_note(note["id"]) is not None
+    assert note["id"] in [n["id"] for n in list_notes()]
+    assert note["id"] not in [n["id"] for n in list_deleted_notes()]
 
 
 # ── List / queries ────────────────────────────────────────────────────────────

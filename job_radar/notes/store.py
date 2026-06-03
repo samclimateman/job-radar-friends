@@ -169,6 +169,13 @@ def soft_delete_note(note_id: str) -> None:
     )
 
 
+def restore_note(note_id: str) -> None:
+    execute(
+        "UPDATE notes SET deleted_at = NULL, updated_at = ? WHERE id = ?",
+        (_now(), note_id),
+    )
+
+
 # ── Queries ───────────────────────────────────────────────────────────────────
 
 def list_notes(
@@ -214,6 +221,19 @@ def list_pinned_notes(limit: int = 10) -> list[dict]:
         LIMIT ?
         """,
         (limit,),
+    )
+    return [_row_to_dict(r) for r in rows]
+
+
+def list_deleted_notes(limit: int = 100, offset: int = 0) -> list[dict]:
+    rows = execute(
+        """
+        SELECT * FROM notes
+        WHERE deleted_at IS NOT NULL
+        ORDER BY deleted_at DESC, updated_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
     )
     return [_row_to_dict(r) for r in rows]
 

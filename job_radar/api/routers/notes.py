@@ -9,8 +9,10 @@ from job_radar.notes.store import (
     archive_note,
     create_note,
     get_note,
+    list_deleted_notes,
     list_notes,
     list_pinned_notes,
+    restore_note,
     soft_delete_note,
     update_note,
 )
@@ -42,6 +44,11 @@ def get_notes(note_type: str | None = None, limit: int = 100):
 @router.get("/pinned")
 def get_pinned():
     return list_pinned_notes(limit=10)
+
+
+@router.get("/trash")
+def get_trash(limit: int = 100):
+    return list_deleted_notes(limit=limit)
 
 
 @router.post("", status_code=201)
@@ -80,4 +87,10 @@ def do_archive(note_id: str):
 @router.delete("/{note_id}")
 def delete_note(note_id: str):
     soft_delete_note(note_id)
+    return {"ok": True}
+
+
+@router.post("/{note_id}/restore")
+def do_restore(note_id: str):
+    restore_note(note_id)
     return {"ok": True}
