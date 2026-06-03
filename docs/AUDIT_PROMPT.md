@@ -30,7 +30,8 @@ Current known state:
 - Universal onboarding, source builder/review, source health, lifecycle tracking, portable backup zip, and deterministic scoring are working.
 - Version/name metadata is centralized through `VERSION`; run `make version-check`.
 - Public release guardrail is `make public-check`: private-marker scan, version/name check, Ruff, pytest, and frontend build.
-- Latest verified public check passed with 157 tests.
+- Release packaging gate is `make release-check`.
+- Latest verified public check passed with 173 tests.
 - App is ad-hoc signed, not notarized; first launch may require right-click -> Open.
 
 Your job:
@@ -96,7 +97,7 @@ Focus areas:
 4. Packaging and release quality
 - Does the DMG/app experience feel credible for a public beta?
 - Are app name, bundle identifier, version metadata, package names, and docs synchronized?
-- Does `make build-app`, `make build-dmg`, and `make public-check` provide a repeatable release path?
+- Does `make build-app`, `make build-dmg`, `make public-check`, and `make release-check` provide a repeatable release path?
 - Are ad-hoc signing and non-notarized first-launch limitations explained honestly?
 - Are generated artifacts, local data, caches, and runtime files ignored appropriately?
 - Are docs aligned with the actual Tauri/FastAPI/React/SQLite app architecture?

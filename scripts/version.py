@@ -44,6 +44,10 @@ def load_metadata() -> dict[str, str]:
     tauri = json.loads(read_text(ROOT / "src-tauri" / "tauri.conf.json"))
     frontend = json.loads(read_text(ROOT / "frontend" / "package.json"))
     frontend_lock = json.loads(read_text(ROOT / "frontend" / "package-lock.json"))
+    frontend_app = read_text(ROOT / "frontend" / "src" / "App.tsx")
+    current_version_match = re.search(r"const CURRENT_VERSION = '([^']+)'", frontend_app)
+    if not current_version_match:
+        raise SystemExit("Could not find CURRENT_VERSION in frontend/src/App.tsx")
     cargo_lock_package = next(
         package for package in cargo_lock["package"] if package["name"] == EXPECTED["rust_name"]
     )
@@ -61,6 +65,7 @@ def load_metadata() -> dict[str, str]:
         "tauri.identifier": tauri["identifier"],
         "frontend.name": frontend["name"],
         "frontend.version": frontend["version"],
+        "frontend.currentVersion": current_version_match.group(1),
         "frontend.lock.name": frontend_lock["name"],
         "frontend.lock.version": frontend_lock["version"],
         "frontend.lock.root.name": frontend_lock["packages"][""]["name"],
@@ -85,6 +90,7 @@ def validate() -> int:
         "cargo.lock.version": version,
         "tauri.version": version,
         "frontend.version": version,
+        "frontend.currentVersion": version,
         "frontend.lock.version": version,
         "frontend.lock.root.version": version,
     }
@@ -163,6 +169,16 @@ def set_version(version: str) -> int:
         ROOT / "frontend" / "package.json",
         {"name": EXPECTED["frontend_name"], "version": version},
     )
+    frontend_app_path = ROOT / "frontend" / "src" / "App.tsx"
+    frontend_app, count = re.subn(
+        r"const CURRENT_VERSION = '[^']+'",
+        f"const CURRENT_VERSION = '{version}'",
+        read_text(frontend_app_path),
+        count=1,
+    )
+    if count != 1:
+        raise SystemExit("Could not update CURRENT_VERSION in frontend/src/App.tsx")
+    write_text(frontend_app_path, frontend_app)
     frontend_lock_path = ROOT / "frontend" / "package-lock.json"
     frontend_lock = json.loads(read_text(frontend_lock_path))
     frontend_lock["name"] = EXPECTED["frontend_name"]

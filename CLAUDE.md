@@ -33,8 +33,9 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 ```bash
 make build-app    # build signed .app bundle
 make build-dmg    # build signed .app and local DMG
-make test         # run test suite (157 tests, offline)
+make test         # run test suite (173 tests, offline as of 2026-06-03)
 make public-check # private-marker scan + Ruff + pytest + frontend build
+make release-check # full public gate before packaging/release
 ```
 
 Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-click → Open on first launch.
@@ -74,7 +75,9 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Block filters persist in the user data directory, so onboarding completion works from read-only DMG/app bundles
 - Portable backup zip is working from dashboard and CLI; includes SQLite DB, jobs CSV, sources JSON, notes JSON/CSV/Markdown, and metadata
 - Public release guardrail: `make public-check` runs private-marker scan, Ruff, pytest, and frontend build
-- Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, and frontend metadata, and `make version-bump-patch|minor|major` updates them together
+- Release guardrail: `make release-check` runs the public gate before packaging/release
+- Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, frontend package metadata, and the React update-banner `CURRENT_VERSION`; `make version-bump-patch|minor|major` updates them together
+- Local mutation protection rejects cross-site browser POST/PUT/PATCH/DELETE requests on the FastAPI and legacy HTML surfaces
 
 ### What changed 2026-06-03
 - Onboarding: copy edits steps 0/1/2, gate bug fixed, sidebar step nav + autosave, live first-scan progress
@@ -82,7 +85,9 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Polish pass: undo dismiss toast, source delete confirmation, note save error, server error banner, clickable issues badge, empty states, setup banner improvements
 - Update banner: checks latest-version.json on GitHub, shows amber banner if newer version available
 - Port conflict: Tauri kills stale impostor process on launch (subsequently reverted from lib.rs — shows warning instead)
-- Source detection and export improvements (from diff)
+- Source detection now normalizes bare domains and rejects unsafe local/private/file/credential URLs
+- Backup restore accepts public backup ZIPs containing `job-radar.sqlite` and raw SQLite database files
+- Local request protection added for browser mutation endpoints
 
 ### What's next (prioritised plan)
 1. **Ship DMG to first beta user** — bump latest-version.json to 0.2.0, send the DMG
@@ -97,4 +102,4 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - **Schema changes must be additive** — user databases at `~/.job-radar/job-radar.sqlite` persist across updates; never DROP, RENAME, or retype columns. New columns go in `schema.sql` + `_ensure_columns()` in `db/client.py`. Full rules in SYSTEM.md.
 - Build not notarised — first-launch requires right-click → Open
 - DMG launch was smoke-tested under automation: React shell, onboarding API, onboarding completion with blockers, needs-review source persistence, and blocklist persistence all passed. A full manual double-click/install test is still needed for window lifecycle, first scan with real URLs, and Gatekeeper behavior.
-- Keep `README.md`, `SYSTEM.md`, and `CLAUDE.md` manually aligned after behavior changes; avoid dynamic counts unless they are verified during the session.
+- Keep `README.md`, `SYSTEM.md`, `CLAUDE.md`, `PACKAGING.md`, and `PUBLISH_CHECKLIST.md` manually aligned after behavior changes; avoid dynamic counts unless they are verified during the session.

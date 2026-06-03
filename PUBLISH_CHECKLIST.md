@@ -1,172 +1,115 @@
-# Job Radar Publish Checklist
+# Job Radar Public Beta Publish Checklist
 
-This checklist is for getting Job Radar from local prototype to a GitHub repo that tech-comfortable friends can try without hand-holding.
+This checklist is for shipping the public `job-radar-friends` repo as a macOS beta DMG. The benchmark is no longer "technical friends can run it from a checkout"; it is "a normal beta tester can install, understand, trust, and recover from mistakes."
 
-## Current Readiness
+## Release Gate
 
-Job Radar is close to a shareable alpha, not yet a polished public product.
-
-Good enough for:
-
-- a private GitHub repo
-- technically comfortable friends
-- macOS users willing to run a command file or a few terminal commands
-- testing 10-50 career-page URLs
-- validating the core loop and UX
-
-Not yet good enough for:
-
-- non-technical users
-- public launch
-- signed one-click install
-- guaranteed scraping across arbitrary career pages
-- Windows users
-- browser-heavy scraping by default
-
-## Before Publishing To GitHub
-
-Required:
-
-- Confirm repo name: `job-radar` or `job-radar-friends`.
-- Keep the repo private at first.
-- Decide license before making the repo public.
-- Add all source files, tests, docs, and command launchers.
-- Do not commit `.venv`, `.DS_Store`, caches, local databases, or `~/.job-radar`.
-- Run the full test suite.
-- Run ruff.
-- Confirm GitHub Actions CI passes.
-- Run `job-radar doctor`.
-- Run the macOS app installer from a clean checkout path.
-- Confirm `~/Applications/Job Radar.app` points to the current checkout path.
-- Confirm the app opens the dashboard.
-- Add 5-10 real sources and run a refresh.
-- Check Source Health after refresh.
-- Export CSV and database backup once.
-
-Recommended:
-
-- Create a short demo source list for friends to test safely.
-- Add screenshots to the README.
-- Add a known limitations section.
-- Add a troubleshooting section for macOS security prompts.
-- Add a release tag such as `v0.1.0-alpha`.
-- Add GitHub issues for known next work instead of hiding gaps.
-
-## QC Matrix
-
-### Install
-
-- Fresh clone works on macOS.
-- `Install Job Radar.command` is executable.
-- Command file creates `.venv` when missing.
-- Command file installs dependencies.
-- Command file installs `~/Applications/Job Radar.app`.
-- App launcher writes failures to `~/.job-radar/launcher.log`.
-- App launcher does not point at an old local path.
-
-### App Startup
-
-- `job-radar setup` initializes local data.
-- `job-radar doctor` reports expected paths.
-- `job-radar start` opens local dashboard.
-- Dock app launches local dashboard.
-- If port is already in use, the failure is understandable.
-
-### First-Run UX
-
-- User can paste multiple URLs.
-- User can preview source detection before saving.
-- User can save URLs.
-- User can save strategy/rubric from the UI.
-- User can optionally save OpenAI, Anthropic, or Ollama settings.
-- User can run first refresh.
-- Empty states are calm and clear.
-
-### Ingestion
-
-- Greenhouse works.
-- Lever works.
-- Workable works.
-- SmartRecruiters works.
-- Ashby works.
-- Personio works.
-- Unknown URLs degrade to needs review or manual watch.
-- Workday degrades to manual watch for now.
-- Failed sources do not crash the full run.
-- No scraper fabricates jobs.
-
-### Scoring
-
-- Saved strategy is active.
-- Ingested jobs receive deterministic scores.
-- Score explanations cite matched rules.
-- Dealbreakers exclude without hiding the job.
-- Negative keywords downgrade.
-- Excluded/stale jobs remain inspectable.
-
-### Source Health
-
-- Each source shows platform, parser, status, last checked, jobs found, new jobs, and error status.
-- Retry one source works.
-- Mark manual watch checked works.
-- Broken URLs are visibly flagged.
-
-### Data
-
-- Jobs trace to source URL and scrape run.
-- CSV export works.
-- Source export works.
-- Database backup works.
-- Local data stays under `~/.job-radar`.
-- API keys are saved only to local `.env`.
-
-### Tests
-
-Run:
+Run before every release candidate:
 
 ```bash
-.venv/bin/python -m pytest
-.venv/bin/python -m ruff check .
+make release-check
 ```
 
-Expected before sharing:
+Expected:
+
+- version/name metadata is synchronized
+- private-marker scan passes
+- Ruff passes
+- pytest passes
+- frontend production build passes
+
+If the release changes app identity or version, run a deliberate bump first:
+
+```bash
+make version-bump-patch
+make version-check
+```
+
+Normal commits and pushes do not bump versions automatically.
+
+## Build
+
+```bash
+make build-dmg
+```
+
+Confirm these artifacts exist:
 
 ```text
-30 passed
-All checks passed!
+src-tauri/target/release/bundle/macos/Job Radar.app
+dist/Job Radar.dmg
 ```
 
-## GitHub Publish Steps
+## Public Repo Hygiene
 
-1. Review `git status --short`.
-2. Stage only intended files.
-3. Commit as `Initial Job Radar alpha`.
-4. Create a private GitHub repo.
-5. Push `main`.
-6. Add a README screenshot and short install instructions.
-7. Create release tag `v0.1.0-alpha`.
-8. Invite 2-3 testers.
+- Repo is public intentionally.
+- License and README are present.
+- README says this is a local-first public beta, not SaaS.
+- README explains ad-hoc signing and first-launch right-click if needed.
+- No private source lists, notes, resumes, applications, cover letters, screenshots, local paths, caches, databases, API keys, or private prompts are committed.
+- `latest-version.json` points to the intended GitHub Release page.
+- Release notes explain beta limitations plainly.
 
-## Known Alpha Limitations
+## Manual Install QA
 
-- macOS only for the friend-friendly path.
-- Not code signed or notarized.
-- Not a true DMG installer yet.
-- No auto-update.
-- Browser/Playwright scraping is not enabled by default.
-- Workday is manual-watch/deferred.
-- LLM setup exists, but scoring is intentionally deterministic.
-- Source packs are not built yet.
-- No restore UI for backups yet.
+Use Finder and the DMG, not a terminal-only launch:
 
-## Ship Criteria For Friend Alpha
+1. Open `dist/Job Radar.dmg`.
+2. Drag `Job Radar.app` into `/Applications`.
+3. Launch from `/Applications`.
+4. Confirm the Tauri window opens without a terminal.
+5. On a clean `~/.job-radar/`, confirm onboarding appears.
+6. Complete onboarding with realistic criteria and sources.
+7. Confirm block filters and criteria persist after restart.
+8. Add a known ATS source and an RSS/feed source.
+9. Run the first scan.
+10. Confirm source health explains failures without breaking the full scan.
+11. Triage a job through shortlist/reject/applied.
+12. Create, edit, export, and archive a notebook note.
+13. Create a backup ZIP.
+14. Restore from a backup ZIP or raw database in a disposable data directory.
+15. Quit and confirm the backend sidecar stops.
 
-Ship privately when:
+## Product Trust QA
 
-- Fresh clone/install works.
-- Dashboard opens from `Job Radar.app`.
-- At least six platform scrapers pass tests.
-- Real-world refresh works on a small source set.
-- Source failures are visible and non-fatal.
-- Backup/export works.
-- README and friend install docs are clear.
+Check the app like a beta tester:
+
+- Onboarding has no dead ends.
+- Empty states explain what changed and what action is available.
+- Errors are visible, specific, and recoverable.
+- Destructive actions are confirmed or undoable.
+- Scores explain why a job matched without pretending to judge the user.
+- Stale or failed source data does not look fresh.
+- Backup/export gives the user confidence that the app is local and recoverable.
+
+## Security And Privacy QA
+
+- `make release-check` passes.
+- Unsafe local mutation requests are rejected.
+- User-entered URLs reject local/private/file/credential-bearing targets.
+- Scraped/user-entered content is escaped before rendering.
+- Backup/restore rejects unexpected archive formats.
+- `.env`, local databases, cache files, and runtime logs are ignored.
+- No private markers are present in code, docs, release notes, or screenshots.
+
+## Release Steps
+
+1. Decide version bump level.
+2. Run `make version-bump-patch`, `make version-bump-minor`, or `make version-bump-major`.
+3. Update `latest-version.json` and release notes for the intended public version.
+4. Run `make release-check`.
+5. Run `make build-dmg`.
+6. Manually QA the DMG from `/Applications`.
+7. Commit version/docs/release changes.
+8. Tag the release, for example `v0.1.1`.
+9. Upload `dist/Job Radar.dmg` to GitHub Releases.
+10. Reopen the installed app and confirm the update banner behaves as intended.
+
+## Known Beta Limitations
+
+- macOS only.
+- Ad-hoc signed, not notarized.
+- No automatic updater.
+- Browser-heavy scraping is intentionally constrained.
+- Workday and highly dynamic sites may require manual watch.
+- No accounts, sync, telemetry, or cloud backup.

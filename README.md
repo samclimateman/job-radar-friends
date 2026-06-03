@@ -151,7 +151,7 @@ All data is stored in `~/.job-radar/` by default. Override with `JOB_RADAR_DATA_
 
 ```
 ~/.job-radar/
-  job-radar.db      SQLite database
+  job-radar.sqlite  SQLite database
   .env              Optional API keys if configured manually
 ```
 

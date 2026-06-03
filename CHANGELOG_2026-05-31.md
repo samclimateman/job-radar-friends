@@ -1,4 +1,6 @@
 # Job Radar — Development Session Summary
+
+> Historical note: this changelog records an earlier Datasette-era implementation. The current public beta architecture is Tauri + React/Tailwind + FastAPI/Python + SQLite.
 **Date:** 2026-05-31
 
 This document summarises the improvements built in this session. Written for the generic (friends) version of the tool — all changes below are platform-agnostic and can be ported across.

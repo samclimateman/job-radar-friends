@@ -1,5 +1,7 @@
 # Job Radar 2.0 Execution Plan
 
+> Historical planning note: this document includes pre-Tauri and Datasette-era options. The current public beta architecture is Tauri + React/Tailwind + FastAPI/Python + SQLite. Use `README.md`, `SYSTEM.md`, `PACKAGING.md`, and `PUBLISH_CHECKLIST.md` for current build/release guidance.
+
 Execute 2.0 in six phases. Each phase should produce something testable.
 
 ## Phase 1: Product Hardening

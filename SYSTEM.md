@@ -1,5 +1,32 @@
 # Job Radar System Notes
 
+## Current Architecture
+
+Job Radar public beta is a local-first macOS desktop app:
+
+- Tauri owns the native app shell, WebView window, app lifecycle, and sidecar launch.
+- The bundled Python sidecar serves the FastAPI/React dashboard on `127.0.0.1:8766`.
+- The legacy HTML admin/settings surface can run on `127.0.0.1:8767`.
+- SQLite user data lives in `~/.job-radar/job-radar.sqlite`.
+- There is no Datasette runtime in the current public app.
+
+Keep docs, package metadata, and release scripts aligned with this architecture. If behavior changes, update `README.md`, `PACKAGING.md`, `PUBLISH_CHECKLIST.md`, and `CLAUDE.md` in the same work session.
+
+## Release And Version Rule
+
+Version metadata is centralized in `VERSION`. Use:
+
+```bash
+make version-check
+make version-bump-patch
+make version-bump-minor
+make version-bump-major
+```
+
+The version script validates Python, Tauri/Rust, frontend package metadata, and the React update-banner `CURRENT_VERSION`. Ordinary commits and pushes do not bump versions automatically; version bumps are deliberate release actions.
+
+Run `make release-check` before a public beta build or release.
+
 ## Database Migration Rule
 
 User data lives in `~/.job-radar/job-radar.sqlite`, which persists across app updates. The schema is initialised by `job_radar/db/schema.sql` using `CREATE TABLE IF NOT EXISTS`, so existing tables are never recreated.
@@ -46,3 +73,21 @@ Implementation checklist for future browser scrapers:
 2. If calling `sync_playwright()` directly, add `requires_browser = True` manually.
 3. Do not bypass `_fetch_jobs()` when running sources from the ingestion runner.
 4. Keep scraper failures non-fatal so manual refresh still returns source-health errors rather than breaking the full run.
+
+## Local Request Protection Rule
+
+Local browser mutation endpoints must reject cross-site browser requests. Shared logic lives in `job_radar/security/local_requests.py`.
+
+Unsafe methods are:
+
+- `POST`
+- `PUT`
+- `PATCH`
+- `DELETE`
+
+Allowed browser mutation requests must come from trusted localhost/Tauri origins and expected local ports. Keep this protection wired into both:
+
+- FastAPI middleware in `job_radar/api/main.py`
+- Legacy HTML POST handling in `job_radar/app/server.py`
+
+Regression tests live in `tests/test_local_request_protection.py`.

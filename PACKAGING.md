@@ -1,89 +1,105 @@
-# Job Radar Packaging Plan
+# Job Radar Packaging
 
-Phase 6 has two tracks: a near-term DMG for testing and a proper Tauri desktop shell for 2.0.
+Job Radar is now packaged as a Tauri desktop app for macOS. The app opens a native WebView window, launches the bundled Python/FastAPI backend as a sidecar, serves the React dashboard, and stores user data locally in `~/.job-radar/`.
 
-## Track A: Current App DMG Prototype
+This is a public beta packaging flow. The app is ad-hoc signed for tester distribution, but it is not Apple Developer ID notarized yet.
 
-This creates a DMG around the current `~/Applications/Job Radar.app` wrapper.
+## Architecture
 
-Use it for:
+- `src-tauri/` owns the desktop shell, window lifecycle, sidecar launch, and macOS bundle metadata.
+- `frontend/` builds the React dashboard into `frontend/dist`.
+- `job_radar/` remains the Python source of truth for scraping, SQLite, scoring, exports, and local API routes.
+- The Tauri app serves the React/FastAPI dashboard on `127.0.0.1:8766`.
+- The legacy HTML admin/settings surface runs on `127.0.0.1:8767` when needed.
 
-- local visual testing
-- sharing with one very technical tester
-- validating icon, app name, and Finder flow
+## Versioning
 
-Do not treat it as the final installer. The current app wrapper still points at a local checkout and expects Python/dependencies to exist or be installable.
+Version metadata is centralized in `VERSION`.
 
-Build:
+Before packaging, run:
 
 ```bash
-scripts/build_dmg_prototype.sh
+make version-check
 ```
 
-Output:
+To release a new version, use one of:
+
+```bash
+make version-bump-patch
+make version-bump-minor
+make version-bump-major
+```
+
+The version script updates and validates:
+
+- `VERSION`
+- `pyproject.toml`
+- `src-tauri/Cargo.toml`
+- `src-tauri/Cargo.lock`
+- `src-tauri/tauri.conf.json`
+- `frontend/package.json`
+- `frontend/package-lock.json`
+- `frontend/src/App.tsx` update-banner version
+
+Normal pushes do not auto-bump the version. Version bumps are deliberate release actions.
+
+## Build
+
+```bash
+make build-sidecar
+make build-app
+make build-dmg
+```
+
+Outputs:
 
 ```text
-dist/Job Radar Prototype.dmg
+dist/job-radar-server/job-radar-server
+src-tauri/target/release/bundle/macos/Job Radar.app
+dist/Job Radar.dmg
 ```
 
-## Track B: Tauri 2.0 App
+`make build-app` runs `make version-check`, builds the React frontend, builds the Python sidecar, builds the Tauri `.app`, copies the sidecar into the bundle, and ad-hoc signs the app.
 
-Target user experience:
+`make build-dmg` packages the signed `.app` into a drag-to-Applications DMG.
 
-```text
-Download Job Radar.dmg
-Drag Job Radar to Applications
-Open Job Radar
-First-run wizard starts
-No terminal required
+## Release Gate
+
+Before publishing a GitHub Release:
+
+```bash
+make release-check
+make build-dmg
 ```
 
-Recommended architecture:
+`make release-check` runs the full public safety gate:
 
-- Python backend remains the source of truth for scraping, SQLite, scoring, and exports.
-- Tauri shell owns the desktop window, menus, app lifecycle, and packaging.
-- Tauri launches the local Python backend as a sidecar or bundled executable.
-- The UI initially continues to use the existing local web app.
-- Later, the frontend can move into a Tauri-native webview app.
+- version/name synchronization
+- private-marker scan
+- Ruff
+- pytest
+- frontend production build
 
-## Work Needed For Real 2.0 Packaging
+## Manual QA
 
-1. Decide bundling strategy:
-   - PyInstaller Python backend sidecar
-   - or a self-contained Python runtime plus package
+Run this before sending a DMG to a tester:
 
-2. Add Tauri shell:
-   - app name
-   - icon
-   - window sizing
-   - launch local backend
-   - open local URL in webview
+1. Install the DMG into `/Applications`.
+2. Launch via Finder, not from the terminal.
+3. Confirm first-run onboarding appears on a clean data directory.
+4. Add at least one known source and one RSS/feed source.
+5. Run a refresh and confirm source health is understandable.
+6. Verify Jobs, Sources, Applied, Notebook, Settings, backup, and restore flows.
+7. Quit the app and confirm the backend sidecar exits.
+8. Relaunch and confirm existing data persists.
+9. Note any Gatekeeper/right-click instructions needed by the tester.
 
-3. Add macOS build:
-   - `.app`
-   - `.dmg`
-   - app icon
-   - minimum macOS version
+## Not Yet Production-Grade
 
-4. Add trust:
-   - Apple Developer ID
-   - code signing
-   - notarization
-   - hardened runtime
+- No Developer ID notarization.
+- No automatic updates.
+- No Windows/Linux packaged installers.
+- No crash reporting or telemetry by design.
+- Public update banner depends on `latest-version.json` in GitHub.
 
-5. Add installer checks:
-   - app data directory created
-   - database migrations run
-   - first-run wizard opens
-   - backend exits when app closes
-   - friendly failure dialog if backend cannot start
-
-## Phase 6 Done Criteria
-
-- DMG opens cleanly.
-- App launches without terminal.
-- Normal users do not see Python.
-- First-run wizard appears on a clean machine.
-- Source health and backup/export still work.
-- Signed/notarized build avoids alarming macOS prompts.
-
+These gaps are acceptable for a public beta, but they are paid-quality blockers before a wider non-technical launch.

@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test public-check version version-check version-bump-patch version-bump-minor version-bump-major
+.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test public-check release-check version version-check version-bump-patch version-bump-minor version-bump-major
 
 # Run the old HTML server (admin/settings pages)
 dev:
@@ -21,6 +21,9 @@ test:
 
 public-check:
 	.venv/bin/python scripts/public_check.py
+
+release-check: public-check
+	@echo "Release gate passed. For an actual release, bump VERSION first with make version-bump-patch|minor|major, then build the DMG."
 
 version:
 	.venv/bin/python scripts/version.py show
