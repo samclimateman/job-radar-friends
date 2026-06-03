@@ -134,12 +134,18 @@ fn dirs_path() -> std::path::PathBuf {
     std::path::PathBuf::from(home).join(".job-radar")
 }
 
+#[tauri::command]
+fn open_external(url: String) {
+    let _ = std::process::Command::new("open").arg(&url).spawn();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let server_proc: Arc<Mutex<Option<std::process::Child>>> = Arc::new(Mutex::new(None));
     let server_proc_setup = server_proc.clone();
 
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![open_external])
         .setup(move |app| {
             let (child, warnings) = start_server();
             *server_proc_setup.lock().unwrap() = child;

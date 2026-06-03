@@ -44,6 +44,7 @@ def load_metadata() -> dict[str, str]:
     tauri = json.loads(read_text(ROOT / "src-tauri" / "tauri.conf.json"))
     frontend = json.loads(read_text(ROOT / "frontend" / "package.json"))
     frontend_lock = json.loads(read_text(ROOT / "frontend" / "package-lock.json"))
+    latest_version = json.loads(read_text(ROOT / "latest-version.json"))
     frontend_app = read_text(ROOT / "frontend" / "src" / "App.tsx")
     current_version_match = re.search(r"const CURRENT_VERSION = '([^']+)'", frontend_app)
     if not current_version_match:
@@ -70,6 +71,7 @@ def load_metadata() -> dict[str, str]:
         "frontend.lock.version": frontend_lock["version"],
         "frontend.lock.root.name": frontend_lock["packages"][""]["name"],
         "frontend.lock.root.version": frontend_lock["packages"][""]["version"],
+        "latest.version": latest_version["version"],
     }
 
 
@@ -93,6 +95,7 @@ def validate() -> int:
         "frontend.currentVersion": version,
         "frontend.lock.version": version,
         "frontend.lock.root.version": version,
+        "latest.version": version,
     }
 
     failures = []
@@ -165,6 +168,7 @@ def set_version(version: str) -> int:
     replace_version_line(ROOT / "src-tauri" / "Cargo.toml", "version", version)
     update_cargo_lock(version)
     update_json(ROOT / "src-tauri" / "tauri.conf.json", {"version": version})
+    update_json(ROOT / "latest-version.json", {"version": version})
     update_json(
         ROOT / "frontend" / "package.json",
         {"name": EXPECTED["frontend_name"], "version": version},

@@ -9,7 +9,12 @@ import type {
 // Open a URL: uses macOS `open` via Tauri command when running in the desktop
 // app, falls back to window.open in the browser.
 function openExternal(url: string) {
-  window.open(url, '_blank', 'noopener,noreferrer')
+  const tauri = (window as Window & { __TAURI_INTERNALS__?: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__
+  if (tauri) {
+    tauri.invoke('open_external', { url }).catch(() => window.open(url, '_blank', 'noopener,noreferrer'))
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -20,7 +25,7 @@ type SortDir = 'asc' | 'desc'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CURRENT_VERSION = '0.1.1'
+const CURRENT_VERSION = '0.1.2'
 const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
 
 const JOB_VIEWS = [
@@ -174,10 +179,10 @@ function UpdateBanner({ version, downloadUrl, onDismiss }: {
   return (
     <div className="flex items-center gap-3 px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-sm flex-shrink-0">
       <span className="text-amber-800 font-medium">Job Radar v{version} is available.</span>
-      <a href={downloadUrl} target="_blank" rel="noreferrer"
+      <button onClick={() => openExternal(downloadUrl)}
         className="text-amber-900 font-semibold underline underline-offset-2 hover:text-amber-950 transition-colors">
         Download now ↗
-      </a>
+      </button>
       <button onClick={onDismiss}
         className="ml-auto text-amber-500 hover:text-amber-700 text-xs font-medium transition-colors">
         Dismiss
@@ -589,9 +594,10 @@ function JobRow({ job, selected, onClick, onLocationFilter, onDismiss }: {
             title="Hide job — removes from all views"
             className="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded px-1.5 py-0.5 text-xs font-bold leading-none transition-colors border border-transparent hover:border-red-200"
           >✕</button>
-          <a href={job.source_url} target="_blank" rel="noreferrer"
-            onClick={e => e.stopPropagation()}
-            className="text-xs text-sky-600 hover:text-sky-800 hover:underline">Open ↗</a>
+          <button
+            onClick={e => { e.stopPropagation(); openExternal(job.source_url) }}
+            className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
+          >Open ↗</button>
         </div>
       </td>
     </tr>
@@ -1008,8 +1014,8 @@ function SourceTable({
                   ) : (
                     <>
                       <p className="text-sm font-medium text-slate-800">{r.org_name}</p>
-                      <a href={r.url} target="_blank" rel="noreferrer"
-                        className="text-xs text-sky-600 hover:underline break-all">{r.url}</a>
+                      <button onClick={() => openExternal(r.url)}
+                        className="text-xs text-sky-600 hover:underline break-all text-left">{r.url}</button>
                       {r.notes && <p className="text-xs text-slate-400 mt-1">{r.notes}</p>}
                     </>
                   )}
@@ -1260,9 +1266,10 @@ function ApplicationTable({ apps, onStage, onOutcome }: {
                 )}
               </td>
               <td className="px-4 py-3 text-right">
-                <a href={app.source_url} target="_blank" rel="noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  className="text-xs text-sky-600 hover:text-sky-800 hover:underline">Open ↗</a>
+                <button
+                  onClick={e => { e.stopPropagation(); openExternal(app.source_url) }}
+                  className="text-xs text-sky-600 hover:text-sky-800 hover:underline"
+                >Open ↗</button>
               </td>
             </tr>
           ))}
@@ -2440,7 +2447,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
                             </span>
                           </td>
                           <td className="px-3 py-2 text-right whitespace-nowrap">
-                            {source.url && <a href={source.url} target="_blank" rel="noreferrer" className="text-xs text-sky-600 hover:underline mr-3">Open</a>}
+                            {source.url && <button onClick={() => openExternal(source.url)} className="text-xs text-sky-600 hover:underline mr-3">Open</button>}
                             <button onClick={() => updateSource(realIdx, { verified: !source.verified })}
                               className="text-xs text-slate-600 hover:text-slate-900 font-medium">
                               {source.verified ? 'Uncheck' : 'Mark checked'}
