@@ -44,6 +44,7 @@ from job_radar.ingestion.runner import run_ingestion
 from job_radar.ingestion.source_detection import SourceUrlError
 from job_radar.ingestion.source_store import add_source, mark_manual_checked
 from job_radar.scoring.store import save_rubric
+from job_radar.security.local_requests import is_trusted_local_request
 
 
 def serve(port: int = 8766, open_browser: bool = True) -> None:
@@ -137,6 +138,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         ))
 
     def do_POST(self) -> None:
+        if not self._trusted_post():
+            self.send_error(403, "Cross-site requests are not allowed")
+            return
+
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length).decode("utf-8")
         form = parse_qs(body)
@@ -347,6 +352,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format: str, *args) -> None:
         return
+
+    def _trusted_post(self) -> bool:
+        port = int(self.server.server_address[1])
+        allowed_ports = {port, 8766, 8767, 5173}
+        return is_trusted_local_request(
+            method="POST",
+            origin=self.headers.get("Origin"),
+            referer=self.headers.get("Referer"),
+            sec_fetch_site=self.headers.get("Sec-Fetch-Site"),
+            allowed_ports=allowed_ports,
+        )
 
     def _send_html(self, body: str) -> None:
         payload = body.encode("utf-8")

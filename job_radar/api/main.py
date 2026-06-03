@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from job_radar.api.routers import applications, blocklist, jobs, notes, onboarding, refresh, sources
 from job_radar.db.client import init_db
+from job_radar.security.local_requests import is_trusted_local_request
 
 app = FastAPI(title="Job Radar API", version="0.1.0")
 
@@ -26,6 +27,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def reject_cross_site_mutations(request: Request, call_next):
+    allowed_ports = {8766, 8767, 5173}
+    trusted = is_trusted_local_request(
+        method=request.method,
+        origin=request.headers.get("origin"),
+        referer=request.headers.get("referer"),
+        sec_fetch_site=request.headers.get("sec-fetch-site"),
+        allowed_ports=allowed_ports,
+    )
+    if not trusted:
+        return JSONResponse({"detail": "Cross-site requests are not allowed"}, status_code=403)
+    return await call_next(request)
 
 app.include_router(jobs.router, prefix="/api")
 app.include_router(sources.router, prefix="/api")
