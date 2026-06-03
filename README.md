@@ -101,6 +101,22 @@ job-radar doctor                   # Check local runtime
 
 ---
 
+## Versioning
+
+Version metadata is centralized through `VERSION` and checked across Python, Tauri/Rust, and frontend metadata:
+
+```bash
+make version              # show synchronized names and versions
+make version-check        # fail if names or versions drift
+make version-bump-patch   # bump VERSION and all app metadata, e.g. 0.1.0 -> 0.1.1
+make version-bump-minor
+make version-bump-major
+```
+
+`make public-check` runs the version/name check before Ruff, tests, and the frontend build.
+
+---
+
 ## Desktop app build (macOS, beta)
 
 A Tauri-based desktop wrapper is included. It spawns the Python server and opens the dashboard in a native window.

@@ -99,6 +99,7 @@ def main() -> int:
     failures += scan_private_markers()
 
     checks = [
+        [".venv/bin/python", "scripts/version.py", "check"],
         [".venv/bin/ruff", "check", "."],
         [".venv/bin/pytest"],
         ["npm", "run", "build"],

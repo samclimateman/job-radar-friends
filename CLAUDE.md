@@ -74,6 +74,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Block filters persist in the user data directory, so onboarding completion works from read-only DMG/app bundles
 - Portable backup zip is working from dashboard and CLI; includes SQLite DB, jobs CSV, sources JSON, notes JSON/CSV/Markdown, and metadata
 - Public release guardrail: `make public-check` runs private-marker scan, Ruff, pytest, and frontend build
+- Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, and frontend metadata, and `make version-bump-patch|minor|major` updates them together
 
 ### What's next (prioritised plan)
 1. **Manual human QA from the public beta DMG** — install/open the app like a beta tester would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.

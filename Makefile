@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test public-check
+.PHONY: dev dev-api dev-ui build-sidecar build-app build-dmg sign clean test public-check version version-check version-bump-patch version-bump-minor version-bump-major
 
 # Run the old HTML server (admin/settings pages)
 dev:
@@ -22,6 +22,21 @@ test:
 public-check:
 	.venv/bin/python scripts/public_check.py
 
+version:
+	.venv/bin/python scripts/version.py show
+
+version-check:
+	.venv/bin/python scripts/version.py check
+
+version-bump-patch:
+	.venv/bin/python scripts/version.py bump patch
+
+version-bump-minor:
+	.venv/bin/python scripts/version.py bump minor
+
+version-bump-major:
+	.venv/bin/python scripts/version.py bump major
+
 # Compile the Python server into a standalone binary via PyInstaller
 build-sidecar:
 	.venv/bin/pip install pyinstaller
@@ -29,7 +44,7 @@ build-sidecar:
 	@echo "Sidecar built: dist/job-radar-server/job-radar-server"
 
 # Build the full Tauri .app, copy the sidecar in, then ad-hoc sign
-build-app: build-frontend build-sidecar
+build-app: version-check build-frontend build-sidecar
 	export PATH="$$HOME/.cargo/bin:$$PATH" && cargo tauri build --bundles app
 	@APP="src-tauri/target/release/bundle/macos/Job Radar.app/Contents/Resources" && \
 	 mkdir -p "$$APP/job-radar-server" && \
