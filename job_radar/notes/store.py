@@ -176,6 +176,17 @@ def restore_note(note_id: str) -> None:
     )
 
 
+def purge_note(note_id: str) -> None:
+    execute(
+        "DELETE FROM notes WHERE id = ? AND deleted_at IS NOT NULL",
+        (note_id,),
+    )
+
+
+def purge_deleted_notes() -> None:
+    execute("DELETE FROM notes WHERE deleted_at IS NOT NULL")
+
+
 # ── Queries ───────────────────────────────────────────────────────────────────
 
 def list_notes(

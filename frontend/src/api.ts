@@ -280,6 +280,8 @@ export const api = {
   archiveNote: (id: string) => post<{ ok: boolean }>(`/notes/${id}/archive`),
   deleteNote: (id: string) => del<{ ok: boolean }>(`/notes/${id}`),
   restoreNote: (id: string) => post<{ ok: boolean }>(`/notes/${id}/restore`),
+  purgeNote: (id: string) => del<{ ok: boolean }>(`/notes/${id}/purge`),
+  emptyTrash: () => del<{ ok: boolean }>('/notes/trash'),
   onboarding: () => get<OnboardingState>('/onboarding'),
   saveOnboarding: (state: Partial<Pick<OnboardingState, 'partial' | 'last_step' | 'answers'>>) =>
     patch<OnboardingState>('/onboarding', state),

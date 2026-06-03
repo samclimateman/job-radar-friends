@@ -12,6 +12,8 @@ from job_radar.notes.store import (
     list_deleted_notes,
     list_notes,
     list_pinned_notes,
+    purge_deleted_notes,
+    purge_note,
     restore_note,
     soft_delete_note,
     update_note,
@@ -84,6 +86,12 @@ def do_archive(note_id: str):
     return {"ok": True}
 
 
+@router.delete("/trash")
+def empty_trash():
+    purge_deleted_notes()
+    return {"ok": True}
+
+
 @router.delete("/{note_id}")
 def delete_note(note_id: str):
     soft_delete_note(note_id)
@@ -93,4 +101,10 @@ def delete_note(note_id: str):
 @router.post("/{note_id}/restore")
 def do_restore(note_id: str):
     restore_note(note_id)
+    return {"ok": True}
+
+
+@router.delete("/{note_id}/purge")
+def do_purge(note_id: str):
+    purge_note(note_id)
     return {"ok": True}

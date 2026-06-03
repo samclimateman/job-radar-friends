@@ -19,6 +19,8 @@ from job_radar.notes.store import (
     list_notes_for_entity,
     list_pinned_notes,
     list_recent_notes,
+    purge_deleted_notes,
+    purge_note,
     restore_note,
     search_notes,
     soft_delete_note,
@@ -198,6 +200,29 @@ def test_restore_note_returns_note_to_active_list():
     assert get_note(note["id"]) is not None
     assert note["id"] in [n["id"] for n in list_notes()]
     assert note["id"] not in [n["id"] for n in list_deleted_notes()]
+
+
+def test_purge_note_only_permanently_deletes_trashed_notes():
+    active = create_note(body="Do not purge")
+    deleted = create_note(body="Purge me")
+    soft_delete_note(deleted["id"])
+
+    purge_note(active["id"])
+    purge_note(deleted["id"])
+
+    assert get_note(active["id"]) is not None
+    assert deleted["id"] not in [n["id"] for n in list_deleted_notes()]
+
+
+def test_purge_deleted_notes_empties_trash_without_touching_active_notes():
+    active = create_note(body="Keep")
+    deleted = create_note(body="Trash")
+    soft_delete_note(deleted["id"])
+
+    purge_deleted_notes()
+
+    assert get_note(active["id"]) is not None
+    assert list_deleted_notes() == []
 
 
 # ── List / queries ────────────────────────────────────────────────────────────

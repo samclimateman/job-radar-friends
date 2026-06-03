@@ -20,7 +20,7 @@ type SortDir = 'asc' | 'desc'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CURRENT_VERSION = '0.1.0'
+const CURRENT_VERSION = '0.1.1'
 const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
 
 const JOB_VIEWS = [
@@ -1471,6 +1471,19 @@ function NotebookView() {
     }).catch(console.error)
   }
 
+  function handlePurge(note: Note) {
+    if (!window.confirm('Permanently delete this note? This cannot be undone.')) return
+    api.purgeNote(note.id).then(() => {
+      setNotes(prev => prev.filter(n => n.id !== note.id))
+      if (selectedId === note.id) setSelectedId(null)
+      setChecked(prev => {
+        const next = new Set(prev)
+        next.delete(note.id)
+        return next
+      })
+    }).catch(console.error)
+  }
+
   function handleCheck(id: string, v: boolean) {
     setChecked(prev => {
       const next = new Set(prev)
@@ -1508,6 +1521,25 @@ function NotebookView() {
     }).catch(console.error)
   }
 
+  function handlePurgeSelected() {
+    const ids = [...checked]
+    if (!window.confirm(`Permanently delete ${ids.length} note${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return
+    Promise.all(ids.map(id => api.purgeNote(id))).then(() => {
+      setNotes(prev => prev.filter(n => !ids.includes(n.id)))
+      if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+      setChecked(new Set())
+    }).catch(console.error)
+  }
+
+  function handleEmptyTrash() {
+    if (!window.confirm('Permanently delete every note in Trash? This cannot be undone.')) return
+    api.emptyTrash().then(() => {
+      setNotes([])
+      setSelectedId(null)
+      setChecked(new Set())
+    }).catch(console.error)
+  }
+
   const filtered = notes.filter(n => {
     if (typeFilter && n.note_type !== typeFilter) return false
     if (search) {
@@ -1539,6 +1571,12 @@ function NotebookView() {
             className="w-full px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
             + New note
           </button>
+          {trashMode && notes.length > 0 && (
+            <button onClick={handleEmptyTrash}
+              className="w-full px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50 transition-colors">
+              Empty Trash
+            </button>
+          )}
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search notes…"
             className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-200 bg-white" />
@@ -1574,10 +1612,16 @@ function NotebookView() {
           <div className="border-t border-slate-200 px-3 py-2 flex items-center gap-2 bg-white">
             <span className="text-xs text-slate-500 mr-auto">{checked.size} selected</span>
             {trashMode ? (
+              <>
               <button onClick={handleRestoreSelected}
                 className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors">
                 Restore
               </button>
+              <button onClick={handlePurgeSelected}
+                className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors">
+                Delete forever
+              </button>
+              </>
             ) : (
               <>
                 <button onClick={handleArchiveSelected}
@@ -1626,10 +1670,16 @@ function NotebookView() {
                 {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
                 {!saving && saveError && <span className="text-xs text-red-500 font-medium">Could not save — check your connection</span>}
                 {trashMode ? (
+                  <div className="flex items-center gap-2">
                   <button onClick={() => handleRestore(selected)}
                     className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-600 hover:bg-emerald-50 transition-colors font-medium">
                     Restore
                   </button>
+                  <button onClick={() => handlePurge(selected)}
+                    className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors font-medium">
+                    Delete forever
+                  </button>
+                  </div>
                 ) : (
                   <>
                 <button onClick={() => handlePin(selected)}

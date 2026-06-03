@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
-  "notes": "Initial public beta",
+  "version": "0.1.1",
+  "notes": "Adds notebook Trash, restore, and permanent delete options.",
   "download_url": "https://github.com/samclimateman/job-radar-friends/releases"
 }
