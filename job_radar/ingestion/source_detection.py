@@ -3,18 +3,63 @@
 from __future__ import annotations
 
 import re
+from ipaddress import ip_address
 from urllib.parse import urlparse
 
 from job_radar.ingestion.models import SourceDetection
 
+LOCAL_HOSTS = {"localhost"}
+ALLOWED_SCHEMES = {"http", "https"}
+
+
+class SourceUrlError(ValueError):
+    """Raised when a pasted source URL is unsafe or unsupported."""
+
+
+def normalize_source_url(url: str) -> str:
+    """Return a safe, absolute HTTP(S) source URL."""
+    candidate = (url or "").strip()
+    if not candidate:
+        raise SourceUrlError("Source URL cannot be empty")
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+
+    parsed = urlparse(candidate)
+    if parsed.scheme.lower() not in ALLOWED_SCHEMES:
+        raise SourceUrlError("Source URL must start with http:// or https://")
+    if not parsed.hostname:
+        raise SourceUrlError("Source URL must include a hostname")
+    if parsed.username or parsed.password:
+        raise SourceUrlError("Source URL must not include credentials")
+
+    host = parsed.hostname.lower().strip(".")
+    if host in LOCAL_HOSTS or host.endswith(".localhost") or host.endswith(".local"):
+        raise SourceUrlError("Localhost and local-network source URLs are not supported")
+    try:
+        parsed_ip = ip_address(host)
+    except ValueError:
+        pass
+    else:
+        if (
+            parsed_ip.is_private
+            or parsed_ip.is_loopback
+            or parsed_ip.is_link_local
+            or parsed_ip.is_reserved
+            or parsed_ip.is_multicast
+            or parsed_ip.is_unspecified
+        ):
+            raise SourceUrlError("Private or local-network source URLs are not supported")
+
+    return parsed._replace(scheme=parsed.scheme.lower(), netloc=parsed.netloc.lower(), fragment="").geturl()
+
 
 def _host(url: str) -> str:
-    parsed = urlparse(url if "://" in url else f"https://{url}")
+    parsed = urlparse(normalize_source_url(url))
     return parsed.netloc.lower()
 
 
 def _path(url: str) -> str:
-    parsed = urlparse(url if "://" in url else f"https://{url}")
+    parsed = urlparse(normalize_source_url(url))
     return parsed.path.strip("/")
 
 
@@ -24,7 +69,7 @@ _RSS_QUERY_HINTS = re.compile(r"(^|&)(feed|format)=(rss|atom|xml)", re.IGNORECAS
 
 
 def _is_rss_url(url: str) -> bool:
-    parsed = urlparse(url if "://" in url else f"https://{url}")
+    parsed = urlparse(normalize_source_url(url))
     path = parsed.path
     return bool(
         _RSS_EXTENSIONS.search(path)
@@ -34,9 +79,9 @@ def _is_rss_url(url: str) -> bool:
 
 
 def detect_source(url: str) -> SourceDetection:
+    clean_url = normalize_source_url(url)
     host = _host(url)
     path = _path(url)
-    clean_url = url.strip()
 
     if _is_rss_url(url):
         return SourceDetection(

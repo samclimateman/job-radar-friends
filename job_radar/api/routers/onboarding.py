@@ -11,6 +11,7 @@ from job_radar.api.routers.blocklist import _load as load_blocklist
 from job_radar.api.routers.blocklist import _save as save_blocklist
 from job_radar.app.state import get_state, set_state
 from job_radar.db.client import execute
+from job_radar.ingestion.source_detection import SourceUrlError
 from job_radar.ingestion.source_store import add_source, set_source_needs_review
 from job_radar.scoring.store import save_rubric
 
@@ -94,7 +95,10 @@ def complete_onboarding(answers: OnboardingAnswers) -> dict[str, Any]:
         url = item.url.strip()
         if not url:
             continue
-        source = add_source(url, organization=item.organization.strip() or None)
+        try:
+            source = add_source(url, organization=item.organization.strip() or None)
+        except SourceUrlError:
+            continue
         notes = item.notes.strip()
         if notes:
             execute(

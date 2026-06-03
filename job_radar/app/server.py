@@ -41,6 +41,7 @@ from job_radar.app.state import set_state
 from job_radar.config.env_file import save_api_env
 from job_radar.db.client import init_db
 from job_radar.ingestion.runner import run_ingestion
+from job_radar.ingestion.source_detection import SourceUrlError
 from job_radar.ingestion.source_store import add_source, mark_manual_checked
 from job_radar.scoring.store import save_rubric
 
@@ -143,7 +144,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path == "/sources/add":
             organization = _first(form, "organization") or None
             for url in _split_urls(_first(form, "urls")):
-                add_source(url, organization=organization)
+                try:
+                    add_source(url, organization=organization)
+                except SourceUrlError as exc:
+                    set_state("source_form_error", str(exc))
             self._redirect("/")
             return
 
@@ -234,10 +238,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             organization = _first(form, "organization") or None
             manual = _first(form, "manual") == "1"
             if url.strip():
-                source = add_source(url.strip(), organization=organization)
-                if manual:
-                    from job_radar.ingestion.source_store import set_source_needs_review
-                    set_source_needs_review(source.id)
+                try:
+                    source = add_source(url.strip(), organization=organization)
+                    if manual:
+                        from job_radar.ingestion.source_store import set_source_needs_review
+                        set_source_needs_review(source.id)
+                except SourceUrlError as exc:
+                    set_state("source_form_error", str(exc))
             self._redirect("/source-health")
             return
 

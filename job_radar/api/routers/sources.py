@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from job_radar.db.client import execute
 from job_radar.ingestion.runner import run_ingestion
-from job_radar.ingestion.source_detection import detect_source
+from job_radar.ingestion.source_detection import SourceUrlError, detect_source, normalize_source_url
 from job_radar.ingestion.source_store import mark_manual_checked
 
 router = APIRouter(tags=["sources"])
@@ -155,9 +155,10 @@ def update_source(source_id: str, body: SourceUpdate):
     if not rows:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    url = body.url.strip()
-    if not url:
-        raise HTTPException(status_code=422, detail="URL cannot be empty")
+    try:
+        url = normalize_source_url(body.url)
+    except SourceUrlError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
     duplicate = execute("SELECT id FROM sources WHERE url = ? AND id != ?", (url, source_id))
     if duplicate:

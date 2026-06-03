@@ -94,13 +94,30 @@ def restore_database(backup_path: str) -> bool:
     if not source.exists() or not source.is_file():
         set_state("last_restore_error", f"Backup file not found: {backup_path}")
         return False
-    if source.suffix not in {".sqlite", ".db"}:
-        set_state("last_restore_error", "Backup must be a .sqlite or .db file")
-        return False
 
     destination = get_settings().db_path
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination)
+    if source.suffix == ".zip":
+        try:
+            with zipfile.ZipFile(source) as zf:
+                names = set(zf.namelist())
+                if "job-radar.sqlite" not in names:
+                    set_state("last_restore_error", "Backup ZIP does not contain job-radar.sqlite")
+                    return False
+                info = zf.getinfo("job-radar.sqlite")
+                if info.file_size <= 0:
+                    set_state("last_restore_error", "Backup ZIP contains an empty database")
+                    return False
+                with zf.open(info) as db_file, destination.open("wb") as out:
+                    shutil.copyfileobj(db_file, out)
+        except zipfile.BadZipFile:
+            set_state("last_restore_error", "Backup ZIP could not be read")
+            return False
+    elif source.suffix in {".sqlite", ".db"}:
+        shutil.copy2(source, destination)
+    else:
+        set_state("last_restore_error", "Backup must be a .zip, .sqlite, or .db file")
+        return False
     init_db()
     set_state("last_restore_error", "")
     set_state("last_scan_report", None)

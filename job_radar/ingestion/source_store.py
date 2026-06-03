@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from job_radar.db.client import execute, init_db
-from job_radar.ingestion.source_detection import detect_source
+from job_radar.ingestion.source_detection import detect_source, normalize_source_url
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def _source_id(url: str, organization: str | None) -> str:
 
 def add_source(url: str, organization: str | None = None) -> StoredSource:
     init_db()
-    clean_url = url.strip()
+    clean_url = normalize_source_url(url)
     detection = detect_source(clean_url)
     status = "needs_review" if detection.manual_review_needed else "active"
     source_id = _source_id(clean_url, organization)
