@@ -31,7 +31,8 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 ```bash
 make build-app    # build signed .app bundle
 make build-dmg    # build signed .app and local DMG
-make test         # run test suite (154 tests, offline)
+make test         # run test suite (157 tests, offline)
+make public-check # private-marker scan + Ruff + pytest + frontend build
 ```
 
 Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-click → Open on first launch.
@@ -40,7 +41,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 
 ## Current State (update each session)
 
-**Last updated:** 2026-06-02
+**Last updated:** 2026-06-03
 
 ### Phase history
 - **Sprint 1–3:** Tauri shell, RSS connector, lifecycle tracking, confidence scoring, dashboard surfaces, source packs
@@ -69,6 +70,8 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Fresh database initialization bug fixed: migrations no longer run against missing base tables
 - Packaged sidecar includes `frontend/dist` and onboarding router; packaged `.app` serves the React onboarding UI on first launch
 - Block filters persist in the user data directory, so onboarding completion works from read-only DMG/app bundles
+- Portable backup zip is working from dashboard and CLI; includes SQLite DB, jobs CSV, sources JSON, notes JSON/CSV/Markdown, and metadata
+- Public release guardrail: `make public-check` runs private-marker scan, Ruff, pytest, and frontend build
 
 ### What's next (prioritised plan)
 1. **Manual human QA from the DMG** — install/open the app like a friend would, complete onboarding through the UI, add/edit sources, and run a first scan with real URLs.
@@ -82,3 +85,4 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
 - Build not notarised — first-launch requires right-click → Open
 - DMG launch was smoke-tested under automation: React shell, onboarding API, onboarding completion with blockers, needs-review source persistence, and blocklist persistence all passed. A full manual double-click/install test is still needed for window lifecycle, first scan with real URLs, and Gatekeeper behavior.
+- Keep `README.md`, `SYSTEM.md`, and `CLAUDE.md` manually aligned after behavior changes; avoid dynamic counts unless they are verified during the session.
