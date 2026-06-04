@@ -56,6 +56,7 @@ def _view_clause(view: str) -> tuple[str, str]:
 @router.get("/jobs")
 def list_jobs(view: str = "best", limit: int = 200, offset: int = 0):
     where, order = _view_clause(view)
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     rows = execute(
         f"SELECT {_JOB_COLS} {_JOIN} {where} {order} LIMIT ? OFFSET ?",
         (limit, offset),
@@ -65,6 +66,7 @@ def list_jobs(view: str = "best", limit: int = 200, offset: int = 0):
 
 @router.get("/jobs/{job_id}")
 def get_job(job_id: str):
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     rows = execute(
         f"""SELECT {_JOB_COLS},
                j.raw_description, j.source_job_id,

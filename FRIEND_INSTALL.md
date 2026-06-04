@@ -7,12 +7,16 @@ This is the current practical install path for a small macOS beta.
 ### GitHub Release DMG
 
 1. Download the latest beta DMG:
-   `https://github.com/samclimateman/job-radar-friends/releases`
+   `https://github.com/samclimateman/job-radar-friends/releases/tag/v0.1.3`
 2. Open `Job.Radar.dmg`.
 3. Drag **Job Radar.app** to **Applications**.
 4. Open **Job Radar**.
 
 This beta is not Apple Developer ID notarized yet. If macOS blocks the first launch, right-click **Job Radar.app**, choose **Open**, then confirm.
+
+Current beta: `v0.1.3`.
+
+Please report whether the app installs cleanly, whether onboarding makes sense without explanation, whether the first scan result feels trustworthy, and whether backup/export makes you comfortable using it with real job-search data.
 
 ### Terminal path
 

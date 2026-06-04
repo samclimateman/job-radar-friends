@@ -21,9 +21,9 @@ Job Radar tracks career pages, stores scraped jobs locally in SQLite, and ranks 
 
 ## Download public beta (macOS)
 
-The current public beta is distributed as a GitHub Release DMG:
+The current public beta is `v0.1.3`, distributed as a GitHub Release DMG:
 
-https://github.com/samclimateman/job-radar-friends/releases
+https://github.com/samclimateman/job-radar-friends/releases/tag/v0.1.3
 
 Download `Job.Radar.dmg`, open it, drag **Job Radar.app** to **Applications**, then launch the app. This beta is ad-hoc signed, not Apple Developer ID notarized, so macOS may require right-click → **Open** on first launch.
 
@@ -31,7 +31,7 @@ The repo is public so beta users, testers, and future contributors can inspect t
 
 ## Beta feedback
 
-If you are testing Job Radar, please use [BETA_FEEDBACK.md](BETA_FEEDBACK.md) for the most useful test path and copy/paste report format. GitHub issue templates are available for bug reports and product feedback.
+If you are testing Job Radar, please use [BETA_FEEDBACK.md](BETA_FEEDBACK.md) for the most useful test path and copy/paste report format. For `v0.1.3`, the most useful feedback is install friction, first-run onboarding, source setup, scan trust, ranking quality, backup/export confidence, and anything that makes the app feel less credible as a local-first desktop beta.
 
 ## Developer quick start (macOS)
 

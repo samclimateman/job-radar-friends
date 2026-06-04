@@ -204,6 +204,8 @@ Results:
 - focused security tests: `27 passed`
 - `cargo check`: passed
 - Packaged `.app` CSP smoke test: passed after app lifecycle cleanup; sidecar releases port `8766` on macOS quit.
+- v0.1.3 release gate: `make release-check` passed with `195` tests.
+- v0.1.3 downloadable DMG: published to GitHub Releases with verified SHA-256 `fa6f0526c12a19f6fa7a1f8dc4a5c5d859228886a348ca769202cf0482c5309a`.
 - tracked sensitive artifact scan: no matches
 - regex secret scan: no matches
 
@@ -219,6 +221,7 @@ The proposed open-source security stack makes sense for this repo, with sequenci
 
 - Do now: Dependabot for Python, npm, Cargo, and GitHub Actions. This repo has `pyproject.toml`, `frontend/package-lock.json`, and `src-tauri/Cargo.lock`, so automated dependency update PRs are a strong fit with low maintenance cost.
 - Done next: Gitleaks for secret detection, OSV-Scanner for dependency vulnerability scanning, and Semgrep Community Edition for Python/TypeScript/Rust static analysis are configured in GitHub Actions. OSV and Semgrep start as report-only while initial findings are triaged.
+- Fixed from initial scanner triage: Personio XML now uses `defusedxml`; description-change hashing now uses SHA-256; controlled dynamic SQL fragments are marked for Semgrep with explicit allowlisted construction where practical.
 - Defer: Trivy until the repo has a container/image/IaC surface or a pinned/action-hardened CI plan. OSV is a cleaner first dependency scanner for this app.
 - Defer: osquery/FleetDM. Useful for developer-machine visibility, but it is endpoint management rather than app hardening and does not belong in the public app repo.
 - Keep in mind: GitHub Actions themselves are supply-chain dependencies. Add scanners deliberately, restrict workflow permissions, and prefer pinned action SHAs once the workflow set stabilizes.
@@ -227,7 +230,7 @@ The proposed open-source security stack makes sense for this repo, with sequenci
 
 1. Add redirect-time checks for any future scraper that follows arbitrary user-supplied URLs.
 2. Design a real per-launch local API token with secure Tauri-to-React bootstrap.
-3. Triage initial scanner findings: OSV Rust/Tauri dependency advisories, XML parsing in Personio, non-cryptographic SHA1 identifier hashing, and controlled dynamic SQL fragments.
+3. Triage remaining scanner findings: OSV Rust/Tauri dependency advisories and any controlled dynamic SQL fragments that should be refactored instead of suppressed.
 4. Add `pip-audit` and `cargo-audit` to the repeatable local security checklist.
 5. Consider a Tauri file picker/token flow for restore instead of free-text paths.
 

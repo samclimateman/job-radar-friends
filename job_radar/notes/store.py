@@ -23,6 +23,14 @@ LINKED_ENTITY_TYPES = frozenset({
     "job", "source", "organization", "application", "contact",
 })
 
+_PATCH_COLUMNS = {
+    "title": "title",
+    "body_markdown": "body_markdown",
+    "note_type": "note_type",
+    "linked_entity_type": "linked_entity_type",
+    "linked_entity_id": "linked_entity_id",
+}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -116,8 +124,6 @@ def get_note(note_id: str) -> dict | None:
 
 
 def update_note(note_id: str, **patch) -> dict | None:
-    allowed = {"title", "body_markdown", "note_type", "linked_entity_type",
-               "linked_entity_id", "tags", "pinned", "archived"}
     if not patch:
         return get_note(note_id)
 
@@ -139,8 +145,9 @@ def update_note(note_id: str, **patch) -> dict | None:
         params.append(1 if patch.pop("archived") else 0)
 
     for key, val in patch.items():
-        if key in allowed:
-            sets.append(f"{key} = ?")
+        column = _PATCH_COLUMNS.get(key)
+        if column:
+            sets.append(f"{column} = ?")
             params.append(val)
 
     if not sets:
@@ -150,6 +157,7 @@ def update_note(note_id: str, **patch) -> dict | None:
     params.append(_now())
     params.append(note_id)
 
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     execute(f"UPDATE notes SET {', '.join(sets)} WHERE id = ?", tuple(params))
     return get_note(note_id)
 
@@ -203,6 +211,7 @@ def list_notes(
         params.append(_validate_note_type(note_type))
 
     where = "WHERE " + " AND ".join(conditions)
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     rows = execute(
         f"SELECT * FROM notes {where} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
         (*params, limit, offset),

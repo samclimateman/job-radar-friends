@@ -305,6 +305,7 @@ def _update_missing_jobs(source_id: str, seen_urls: set[str]) -> None:
     placeholders = ",".join("?" for _ in seen_urls)
 
     # Increment missed_scans for unseen jobs
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     execute(
         f"""
         UPDATE jobs
