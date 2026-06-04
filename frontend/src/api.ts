@@ -208,6 +208,12 @@ export interface OnboardingCompleteResult {
   }[]
 }
 
+export interface DataLocation {
+  data_dir: string
+  database_path: string
+  database_exists: boolean
+}
+
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(BASE + path, window.location.origin)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
@@ -290,4 +296,7 @@ export const api = {
     patch<OnboardingState>('/onboarding', state),
   completeOnboarding: (answers: OnboardingAnswers) =>
     post<OnboardingCompleteResult>('/onboarding/complete', answers),
+  dataLocation: () => get<DataLocation>('/data/location'),
+  restoreData: (backup_path: string) =>
+    post<{ ok: boolean }>('/data/restore', { backup_path }),
 }

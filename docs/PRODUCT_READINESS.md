@@ -128,6 +128,16 @@ Needed:
 - Trash behavior for notes and possibly dismissed jobs.
 - No accidental destructive actions without confirmation.
 
+Engineering plan:
+
+1. [done] Audit existing backup, restore, export, local data path, and tests.
+   - Current state: legacy dashboard and CLI already create backup zips, export jobs/sources/notes, and restore from zip/sqlite/db.
+   - Current tests cover backup contents, restore from raw database, restore from backup zip, notes export, and note trash/purge behavior.
+2. [done] Add public API endpoints for backup/export/restore/data location if the React app cannot already reach them.
+3. [done] Add a Data section in React Settings with backup, export, restore, and local data folder/path.
+4. [done] Add destructive-action guardrails for restore and clear-data-adjacent flows.
+5. [done] Add or tighten tests for the new API/UI-facing data safety paths.
+
 ### 7. Privacy And Security
 
 The product should be explicit about data boundaries.
@@ -141,6 +151,15 @@ Needed:
 - Continue safe-source URL protections.
 - Diagnostics bundle should redact personal data by default.
 
+Engineering plan:
+
+1. [done] Audit existing safe source URL handling, local request protection, docs, and tests.
+   - Current state: source URL normalization rejects localhost/private-network URLs, browser mutation endpoints require trusted local requests, and tests cover both.
+   - Current docs already warn beta testers not to include secrets or sensitive files in feedback.
+2. [done] Add a Privacy & Security section in React Settings with local-first, external requests, AI/API-key, and source safety copy.
+3. [done] Add diagnostics redaction helpers before shipping any diagnostics bundle.
+4. [done] Add tests that diagnostics omit API keys, local env secrets, raw notes, resumes, and private job-search text by default.
+
 ### 8. Support Loop
 
 Beta users need an easy way to report confusion.
@@ -152,6 +171,16 @@ Needed:
 - Beta feedback questions in the app or docs.
 - Known issues section.
 - Small changelog per beta release.
+
+Engineering plan:
+
+1. [done] Audit current beta feedback, changelog, issue-template, and diagnostic surfaces.
+   - Current state: README links to `BETA_FEEDBACK.md`; beta feedback format exists; changelog files exist.
+   - Gap: React app does not yet provide a first-class feedback button or diagnostics bundle.
+2. [done] Add a Support / Beta Feedback section in React Settings.
+3. [done] Add feedback and issue-template links.
+4. [done] Add a diagnostics bundle generator with redacted app/version/source-health metadata.
+5. [done] Add a beta changelog entry for the trust/safety work.
 
 ### 9. Payment Or Donation
 

@@ -9,7 +9,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from job_radar.api.routers import applications, blocklist, jobs, notes, onboarding, refresh, sources
+from job_radar.api.routers import (
+    applications,
+    blocklist,
+    data,
+    jobs,
+    notes,
+    onboarding,
+    refresh,
+    sources,
+)
 from job_radar.db.client import init_db
 from job_radar.security.local_requests import is_trusted_local_request
 
@@ -50,6 +59,7 @@ app.include_router(notes.router, prefix="/api")
 app.include_router(applications.router, prefix="/api")
 app.include_router(blocklist.router, prefix="/api")
 app.include_router(onboarding.router, prefix="/api")
+app.include_router(data.router, prefix="/api")
 
 # Serve the built React frontend from frontend/dist if it exists
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"

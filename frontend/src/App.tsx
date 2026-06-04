@@ -3,7 +3,7 @@ import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { api } from './api'
 import type {
   Job, JobDetail, Radar, SourceHealthSummary, Stats, Application, Note,
-  OnboardingAnswers, OnboardingState, OnboardingSource
+  OnboardingAnswers, OnboardingState, OnboardingSource, DataLocation
 } from './api'
 
 // Open a URL: uses macOS `open` via Tauri command when running in the desktop
@@ -27,6 +27,7 @@ type SortDir = 'asc' | 'desc'
 
 const CURRENT_VERSION = '0.1.2'
 const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
+const FEEDBACK_URL = 'https://github.com/samclimateman/job-radar-friends/issues/new/choose'
 
 const JOB_VIEWS = [
   { key: 'best', label: 'Best Fit' },
@@ -2714,6 +2715,107 @@ function SettingsField({ label, hint, children }: { label: string; hint?: string
   )
 }
 
+function DataSafetySettings({ inputCls }: { inputCls: string }) {
+  const [location, setLocation] = useState<DataLocation | null>(null)
+  const [restorePath, setRestorePath] = useState('')
+  const [restoreState, setRestoreState] = useState<'idle' | 'restoring' | 'restored' | 'error'>('idle')
+
+  useEffect(() => {
+    api.dataLocation().then(setLocation).catch(console.error)
+  }, [])
+
+  async function handleRestore() {
+    const path = restorePath.trim()
+    if (!path) return
+    const ok = window.confirm('Restore will replace the current local database. Create a backup first if you need the current state.')
+    if (!ok) return
+    setRestoreState('restoring')
+    try {
+      await api.restoreData(path)
+      setRestoreState('restored')
+      setTimeout(() => setRestoreState('idle'), 3000)
+    } catch {
+      setRestoreState('error')
+    }
+  }
+
+  return (
+    <SettingsSection title="Data">
+      <SettingsField label="Backup and export" hint="Backups include the local database plus jobs, sources, and notes exports.">
+        <div className="flex flex-wrap gap-2">
+          <a href="/api/data/backup" className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
+            Create backup
+          </a>
+          <a href="/api/data/export/jobs.csv" className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            Export jobs
+          </a>
+          <a href="/api/data/export/sources.json" className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            Export sources
+          </a>
+          <a href="/api/data/export/notes.json" className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            Export notes
+          </a>
+        </div>
+      </SettingsField>
+
+      <SettingsField label="Restore from backup" hint="Paste a local .zip, .sqlite, or .db path. Restore replaces the current local database.">
+        <div className="flex gap-2">
+          <input value={restorePath} onChange={e => setRestorePath(e.target.value)}
+            placeholder="/Users/you/Downloads/job-radar-backup.zip" className={inputCls} />
+          <button onClick={handleRestore} disabled={!restorePath.trim() || restoreState === 'restoring'}
+            className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+            {restoreState === 'restoring' ? 'Restoring…' : 'Restore'}
+          </button>
+        </div>
+        {restoreState === 'restored' && <p className="text-xs text-emerald-600 font-medium">Restore complete. Restart the app if anything looks stale.</p>}
+        {restoreState === 'error' && <p className="text-xs text-red-500">Restore failed. Check the file path and format.</p>}
+      </SettingsField>
+
+      <SettingsField label="Local data location" hint="Your database and runtime files live on this machine.">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 space-y-1">
+          <p className="text-xs text-slate-500 break-all">Folder: <span className="font-medium text-slate-700">{location?.data_dir ?? 'Loading…'}</span></p>
+          <p className="text-xs text-slate-500 break-all">Database: <span className="font-medium text-slate-700">{location?.database_path ?? 'Loading…'}</span></p>
+        </div>
+        {location && (
+          <button onClick={() => openExternal(location.data_dir)}
+            className="mt-2 text-xs text-sky-600 hover:text-sky-800 font-medium">
+            Open data folder
+          </button>
+        )}
+      </SettingsField>
+    </SettingsSection>
+  )
+}
+
+function TrustAndSupportSettings() {
+  return (
+    <>
+      <SettingsSection title="Privacy & Security">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 space-y-2 text-sm text-slate-600">
+          <p><strong className="text-slate-800">Local-first:</strong> jobs, notes, sources, applications, and settings are stored in your local data folder.</p>
+          <p><strong className="text-slate-800">External requests:</strong> scans contact the source URLs you add. Source URL validation blocks localhost and private-network targets.</p>
+          <p><strong className="text-slate-800">AI/API keys:</strong> the core app does not require an API key. If you add one manually, diagnostics should not include it.</p>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Support / Beta Feedback">
+        <SettingsField label="Feedback">
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => openExternal(FEEDBACK_URL)}
+              className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
+              Send feedback
+            </button>
+            <a href="/api/data/diagnostics" className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              Download diagnostics
+            </a>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">Diagnostics include version/path/count metadata and source health summaries, but omit API keys, source URLs, notes, applications, and job descriptions.</p>
+        </SettingsField>
+      </SettingsSection>
+    </>
+  )
+}
+
 function SettingsView({ onboarding, onSaved }: { onboarding: OnboardingState | null; onSaved: () => void }) {
   const [answers, setAnswers] = useState<OnboardingAnswers>(normalizeOnboardingAnswers(onboarding?.answers))
   const [saving, setSaving] = useState(false)
@@ -2846,6 +2948,9 @@ function SettingsView({ onboarding, onSaved }: { onboarding: OnboardingState | n
         <SettingsSection title="Sources">
           <p className="text-sm text-slate-500">Add, edit, or remove monitored career pages in the <strong className="text-slate-700">Sources</strong> tab.</p>
         </SettingsSection>
+
+        <DataSafetySettings inputCls={inputCls} />
+        <TrustAndSupportSettings />
 
         <div className="pt-2 flex items-center gap-4">
           <button onClick={handleSave} disabled={saving}
