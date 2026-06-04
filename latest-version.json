@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
-  "notes": "Fixes desktop external link opening and keeps notebook Trash permanent deletion verified.",
+  "version": "0.1.3",
+  "notes": "Adds security scanning, hardens Personio XML parsing, updates description hashing, and refreshes the downloadable beta DMG.",
   "download_url": "https://github.com/samclimateman/job-radar-friends/releases"
 }

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from xml.etree import ElementTree as ET
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
+from defusedxml.ElementTree import ParseError, fromstring
 
 from job_radar.ingestion.models import ScrapedJob
 
@@ -31,8 +32,8 @@ class PersonioScraper:
         response.raise_for_status()
 
         try:
-            root = ET.fromstring(response.content)
-        except ET.ParseError as exc:
+            root = fromstring(response.content)
+        except ParseError as exc:
             raise RuntimeError(f"Failed to parse Personio XML for {slug}: {exc}") from exc
 
         jobs = []
@@ -66,7 +67,7 @@ def _remote_status(office: str) -> str | None:
     return None
 
 
-def _description(position: ET.Element) -> str:
+def _description(position: Any) -> str:
     parts = []
     for key in ("department", "schedule", "seniority", "yearsOfExperience", "keywords"):
         value = position.findtext(key)
@@ -81,5 +82,5 @@ def _description(position: ET.Element) -> str:
     return "\n".join(parts).strip() or (position.findtext("name") or "")
 
 
-def _raw_payload(position: ET.Element) -> dict:
+def _raw_payload(position: Any) -> dict:
     return {child.tag: child.text for child in position if child.text}

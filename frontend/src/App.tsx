@@ -25,7 +25,7 @@ type SortDir = 'asc' | 'desc'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CURRENT_VERSION = '0.1.2'
+const CURRENT_VERSION = '0.1.3'
 const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
 const FEEDBACK_URL = 'https://github.com/samclimateman/job-radar-friends/issues/new/choose'
 

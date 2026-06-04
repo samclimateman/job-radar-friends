@@ -28,7 +28,7 @@ class StoreResult:
 
 
 def _description_hash(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8", errors="replace")).hexdigest()[:16]
+    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
 def start_run(source_count: int) -> str:
