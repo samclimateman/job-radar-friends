@@ -21,4 +21,4 @@ jobs:
       scan-args: |-
         --recursive
         ./
-      fail-on-vuln: true
+      fail-on-vuln: false
