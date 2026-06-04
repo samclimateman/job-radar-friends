@@ -9,3 +9,11 @@
 - Added redacted diagnostics export with app metadata, local path metadata, aggregate counts, source health summaries, and recent scan run summaries.
 - Diagnostics intentionally omit API keys, environment values, source URLs, raw job descriptions, notes, applications, and private job-search text by default.
 - Added API tests for data location, backup zip download, jobs export, restore rejection, and diagnostics redaction.
+
+## Security Hardening
+
+- Added an explicit Tauri CSP.
+- Removed Tauri startup-warning `eval`; fallback warnings now render through React.
+- Added DNS-resolution checks for user-facing source URL add/update and ingestion paths.
+- Hardened restore with staged database validation, SQLite integrity/schema checks, and automatic pre-restore backup.
+- Considered per-launch local API token and deferred the implementation until there is a secure Tauri-to-React bootstrap path.

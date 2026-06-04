@@ -99,7 +99,7 @@ def complete_onboarding(answers: OnboardingAnswers) -> dict[str, Any]:
         if not url:
             continue
         try:
-            source = add_source(url, organization=item.organization.strip() or None)
+            source = add_source(url, organization=item.organization.strip() or None, resolve_dns=True)
         except SourceUrlError:
             continue
         notes = item.notes.strip()

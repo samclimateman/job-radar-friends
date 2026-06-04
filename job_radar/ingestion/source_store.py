@@ -29,9 +29,9 @@ def _source_id(url: str, organization: str | None) -> str:
     return f"{slug or 'source'}_{uuid4().hex[:8]}"
 
 
-def add_source(url: str, organization: str | None = None) -> StoredSource:
+def add_source(url: str, organization: str | None = None, *, resolve_dns: bool = False) -> StoredSource:
     init_db()
-    clean_url = normalize_source_url(url)
+    clean_url = normalize_source_url(url, resolve_dns=resolve_dns)
     detection = detect_source(clean_url)
     status = "needs_review" if detection.manual_review_needed else "active"
     source_id = _source_id(clean_url, organization)

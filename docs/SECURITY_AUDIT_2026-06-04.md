@@ -33,6 +33,16 @@ The main risks are beta-hardening items rather than emergency blockers:
 4. Local API read/export endpoints are intentionally unauthenticated, so any local process running as the user can read/export data while the app is running.
 5. A Tauri startup warning uses `eval` with partial escaping.
 
+## Remediation Update
+
+Implemented after the initial audit:
+
+- Fixed: Tauri now has an explicit CSP in `src-tauri/tauri.conf.json`.
+- Fixed: source URL validation can resolve DNS and reject hostnames that resolve to private, loopback, link-local, reserved, multicast, or unspecified IPs. User-facing source add/update and ingestion paths use the DNS-aware validation path.
+- Fixed: restore now stages candidate databases, runs SQLite integrity/schema validation, creates an automatic pre-restore backup, and only then replaces the active database.
+- Fixed: the Tauri startup warning no longer uses `win.eval`; fallback startup warnings are passed through a URL query parameter and rendered by React.
+- Considered and deferred: per-launch local API token. A useful version requires a secure bootstrap channel from Tauri/backend to React. A public token endpoint or simple cookie-only token would not stop same-user local processes, which are the actual remaining risk. Keep this as a packaging/Tauri integration task rather than a superficial API change.
+
 ## Threat Model
 
 Primary assets:
@@ -62,46 +72,47 @@ Out of scope for this pass:
 ### P1 - Tauri CSP is disabled
 
 Severity: Medium
+Status: Fixed after initial audit
 
-Evidence:
+Original evidence:
 
-- src-tauri/tauri.conf.json:25 sets `csp` to `null`.
-- src-tauri/tauri.conf.json:28 sets `dangerousDisableAssetCspModification` to `true`.
+- `src-tauri/tauri.conf.json` previously set `csp` to `null`.
+- `src-tauri/tauri.conf.json` previously set `dangerousDisableAssetCspModification` to `true`.
 
 Impact:
 
 If user-entered content, scraped content, or a frontend dependency ever creates an XSS path, there is no CSP defense-in-depth. The current React app mostly renders text safely, but this is still an avoidable hardening gap for a desktop app handling personal data.
 
-Recommendation:
+Remediation:
 
-- Add an explicit CSP.
-- Avoid `dangerousDisableAssetCspModification` unless there is a proven need.
-- Keep `script-src` tight and avoid inline script allowances where possible.
-- Retest Tauri build and local backend loading after CSP changes.
+- Added an explicit CSP in `src-tauri/tauri.conf.json`.
+- Removed `dangerousDisableAssetCspModification`.
+- `cargo check`, frontend build, and `make public-check` passed. Packaged `.app` testing is still recommended.
 
 ### P1 - Source URL validation does not resolve DNS
 
 Severity: Medium
+Status: Fixed after initial audit
 
-Evidence:
+Original evidence:
 
-- job_radar/ingestion/source_detection.py:35 blocks localhost-style hostnames.
-- job_radar/ingestion/source_detection.py:38 only applies IP checks when the hostname itself is an IP literal.
+- `job_radar/ingestion/source_detection.py` blocked localhost-style hostnames.
+- `job_radar/ingestion/source_detection.py` only applied IP checks when the hostname itself was an IP literal.
 
 Impact:
 
 A malicious public hostname could resolve to a private, loopback, or link-local address at fetch time. That could let a source URL probe local/private services despite the literal-IP protections.
 
-Recommendation:
+Remediation:
 
-- Resolve A/AAAA records during validation and reject any private, loopback, link-local, multicast, reserved, or unspecified result.
-- Revalidate final URLs after redirects.
-- Consider validating at fetch time as well as save time, because DNS can change.
-- Add tests for a mocked hostname resolving to `127.0.0.1`, `10.0.0.1`, and `169.254.x.x`.
+- Added DNS-aware validation for user-facing add/update paths and ingestion-time checks.
+- Added mocked tests for hostnames resolving to private and public IPs.
+- Redirect-time checks remain recommended for future arbitrary-URL scrapers.
 
 ### P1 - Restore accepts arbitrary local database paths
 
 Severity: Medium
+Status: Partly fixed after initial audit
 
 Evidence:
 
@@ -113,12 +124,12 @@ Impact:
 
 The app is local-first, so this is not remotely exposed. However, any local process able to reach the localhost API can ask the app to replace its database with another local file. That can cause data loss or corrupted state.
 
-Recommendation:
+Remediation:
 
-- Before restore, always create an automatic pre-restore backup.
-- Validate restored SQLite files with `PRAGMA integrity_check` and expected table/schema checks before replacing the active database.
-- Prefer a Tauri file picker or selected-file token over free-text paths.
-- Consider requiring an app-session token on mutation endpoints.
+- Restore now creates an automatic pre-restore backup.
+- Restore now stages candidate files and validates SQLite integrity plus required schema before replacement.
+- Restore now cleans old SQLite sidecar files around replacement.
+- A Tauri file picker/token flow remains recommended instead of free-text paths.
 
 ### P2 - Local API has no app-session authentication
 
@@ -143,19 +154,20 @@ Recommendation:
 ### P2 - Tauri startup warning uses `eval`
 
 Severity: Low
+Status: Fixed after initial audit
 
-Evidence:
+Original evidence:
 
-- src-tauri/src/lib.rs:173 injects a warning banner with `win.eval(...)`.
+- `src-tauri/src/lib.rs` previously injected a warning banner with `win.eval(...)`.
 
 Impact:
 
 The warning string is partially escaped for backslashes, double quotes, and newlines, but it is inserted into a single-quoted JavaScript string. A path or message containing a single quote could break the script. This is a low-probability path because the message is generated locally during startup failure, but avoiding `eval` is still better desktop hardening.
 
-Recommendation:
+Remediation:
 
-- Replace `eval` string construction with a safer frontend event/state path.
-- If `eval` must stay, serialize the message with JSON string encoding rather than manual escaping.
+- Removed the `win.eval` path.
+- Startup warnings now pass through the fallback app URL as an encoded query parameter and render through React.
 
 ## Positive Controls Observed
 
@@ -202,13 +214,12 @@ Limitations:
 
 ## Recommended Next Fix Order
 
-1. Add DNS-resolution and redirect-time checks to source URL fetching.
-2. Add a Tauri/React CSP and remove disabled asset CSP modification.
-3. Add automatic pre-restore backup plus SQLite integrity/schema validation.
-4. Add a per-launch local API token for sensitive exports and mutations.
-5. Replace startup `win.eval` with JSON-encoded injection or a safer UI path.
-6. Add `pip-audit` and `cargo-audit` to the repeatable security checklist.
+1. Add redirect-time checks for any future scraper that follows arbitrary user-supplied URLs.
+2. Design a real per-launch local API token with secure Tauri-to-React bootstrap.
+3. Add `pip-audit` and `cargo-audit` to the repeatable security checklist.
+4. Re-test Tauri packaging after CSP changes in the packaged `.app`.
+5. Consider a Tauri file picker/token flow for restore instead of free-text paths.
 
 ## Release Readiness Judgment
 
-This is acceptable for a small friend beta if users understand it is local-first beta software. Before wider public beta or any donation/payment framing, fix the first three items above.
+This is acceptable for a small friend beta if users understand it is local-first beta software. Before wider public beta or any donation/payment framing, re-test the packaged `.app` with CSP enabled and complete the local API token design.

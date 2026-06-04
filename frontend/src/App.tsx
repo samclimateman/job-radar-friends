@@ -212,6 +212,15 @@ function UpdateBanner({ version, downloadUrl, onDismiss }: {
   )
 }
 
+function StartupWarningBanner({ message }: { message: string | null }) {
+  if (!message) return null
+  return (
+    <div className="flex items-center gap-3 px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-sm flex-shrink-0">
+      <span className="text-amber-800 font-medium">{message}</span>
+    </div>
+  )
+}
+
 function ScoreExplanationList({ explanation }: { explanation: ScoreExplanation | null }) {
   if (!explanation) return null
 
@@ -3029,6 +3038,7 @@ export default function App() {
   const [updateDismissed, setUpdateDismissed] = useState(false)
   const [undoJob, setUndoJob]           = useState<{ id: string; title: string } | null>(null)
   const [serverError, setServerError]   = useState(false)
+  const startupWarning = new URLSearchParams(window.location.search).get('startup_warning')
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -3150,17 +3160,23 @@ export default function App() {
 
   if (shouldShowOnboarding) {
     return (
-      <OnboardingWizard
-        initialState={onboarding}
-        onTitle={setAppTitle}
-        onDone={() => finishOnboarding('jobs')}
-        onViewSources={() => finishOnboarding('sources')}
-      />
+      <div className="h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
+        <StartupWarningBanner message={startupWarning} />
+        <div className="flex-1 overflow-hidden">
+          <OnboardingWizard
+            initialState={onboarding}
+            onTitle={setAppTitle}
+            onDone={() => finishOnboarding('jobs')}
+            onViewSources={() => finishOnboarding('sources')}
+          />
+        </div>
+      </div>
     )
   }
 
   return (
     <div className="h-screen bg-slate-50 font-sans flex flex-col overflow-hidden">
+      <StartupWarningBanner message={startupWarning} />
       <StatsBar stats={stats} tab={tab} appTitle={appTitle}
         onTab={t => { setTab(t); setSelectedId(null) }}
         onRefresh={handleRefresh} refreshing={refreshing}

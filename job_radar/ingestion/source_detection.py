@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import socket
 from ipaddress import ip_address
 from urllib.parse import urlparse
 
@@ -16,7 +17,7 @@ class SourceUrlError(ValueError):
     """Raised when a pasted source URL is unsafe or unsupported."""
 
 
-def normalize_source_url(url: str) -> str:
+def normalize_source_url(url: str, *, resolve_dns: bool = False) -> str:
     """Return a safe, absolute HTTP(S) source URL."""
     candidate = (url or "").strip()
     if not candidate:
@@ -38,19 +39,34 @@ def normalize_source_url(url: str) -> str:
     try:
         parsed_ip = ip_address(host)
     except ValueError:
-        pass
+        if resolve_dns:
+            _reject_private_dns_targets(host)
     else:
-        if (
-            parsed_ip.is_private
-            or parsed_ip.is_loopback
-            or parsed_ip.is_link_local
-            or parsed_ip.is_reserved
-            or parsed_ip.is_multicast
-            or parsed_ip.is_unspecified
-        ):
-            raise SourceUrlError("Private or local-network source URLs are not supported")
+        _reject_private_ip(parsed_ip)
 
     return parsed._replace(scheme=parsed.scheme.lower(), netloc=parsed.netloc.lower(), fragment="").geturl()
+
+
+def _reject_private_dns_targets(host: str) -> None:
+    try:
+        results = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise SourceUrlError(f"Source URL hostname could not be resolved: {host}") from exc
+    for result in results:
+        address = result[4][0]
+        _reject_private_ip(ip_address(address))
+
+
+def _reject_private_ip(parsed_ip) -> None:
+    if (
+        parsed_ip.is_private
+        or parsed_ip.is_loopback
+        or parsed_ip.is_link_local
+        or parsed_ip.is_reserved
+        or parsed_ip.is_multicast
+        or parsed_ip.is_unspecified
+    ):
+        raise SourceUrlError("Private or local-network source URLs are not supported")
 
 
 def _host(url: str) -> str:

@@ -80,3 +80,25 @@ def test_source_url_normalizes_bare_domains():
 def test_source_url_rejects_unsafe_inputs(url):
     with pytest.raises(SourceUrlError):
         normalize_source_url(url)
+
+
+def test_source_url_rejects_hostname_that_resolves_private(monkeypatch):
+    def fake_getaddrinfo(host, port, type=None):
+        return [(None, None, None, "", ("127.0.0.1", 0))]
+
+    monkeypatch.setattr("job_radar.ingestion.source_detection.socket.getaddrinfo", fake_getaddrinfo)
+
+    with pytest.raises(SourceUrlError):
+        normalize_source_url("https://careers.example.org/jobs", resolve_dns=True)
+
+
+def test_source_url_allows_public_dns_resolution(monkeypatch):
+    def fake_getaddrinfo(host, port, type=None):
+        return [(None, None, None, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr("job_radar.ingestion.source_detection.socket.getaddrinfo", fake_getaddrinfo)
+
+    assert (
+        normalize_source_url("https://careers.example.org/jobs", resolve_dns=True)
+        == "https://careers.example.org/jobs"
+    )

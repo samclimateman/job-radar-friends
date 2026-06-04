@@ -58,7 +58,7 @@ def cmd_detect(args: argparse.Namespace) -> int:
 def cmd_sources_add(args: argparse.Namespace) -> int:
     init_db()
     for url in args.urls:
-        source = add_source(url, organization=args.organization)
+        source = add_source(url, organization=args.organization, resolve_dns=True)
         print(f"{source.id}  {source.platform:<18} {source.status:<12} {source.url}")
     return 0
 

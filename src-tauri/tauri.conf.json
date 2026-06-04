@@ -24,8 +24,7 @@
   },
   "app": {
     "security": {
-      "csp": null,
-      "dangerousDisableAssetCspModification": true
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://127.0.0.1:8766 http://localhost:8766 https://raw.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
   }
 }

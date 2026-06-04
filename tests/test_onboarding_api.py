@@ -30,6 +30,10 @@ def test_onboarding_progress_persists(tmp_path, monkeypatch):
 def test_onboarding_completion_saves_sources_and_rubric(tmp_path, monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(
+        "job_radar.ingestion.source_detection.socket.getaddrinfo",
+        lambda host, port, type=None: [(None, None, None, "", ("93.184.216.34", 0))],
+    )
     init_db()
 
     result = complete_onboarding(OnboardingAnswers(

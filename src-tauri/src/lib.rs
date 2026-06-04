@@ -139,6 +139,22 @@ fn open_external(url: String) {
     let _ = std::process::Command::new("open").arg(&url).spawn();
 }
 
+fn encode_query_component(value: &str) -> String {
+    value
+        .bytes()
+        .flat_map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                vec![byte as char]
+            }
+            b' ' => vec!['+'],
+            _ => {
+                let encoded = format!("%{:02X}", byte);
+                encoded.chars().collect()
+            }
+        })
+        .collect()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let server_proc: Arc<Mutex<Option<std::process::Child>>> = Arc::new(Mutex::new(None));
@@ -156,29 +172,19 @@ pub fn run() {
                         .parse()
                         .expect("invalid server URL"),
                 )
+            } else if !warnings.is_empty() {
+                let msg = encode_query_component(&warnings.join(" "));
+                WebviewUrl::App(format!("index.html?startup_warning={}", msg).into())
             } else {
                 WebviewUrl::App("index.html".into())
             };
 
-            let win = WebviewWindowBuilder::new(app, "main", url)
+            WebviewWindowBuilder::new(app, "main", url)
                 .title("Job Radar")
                 .inner_size(1400.0, 900.0)
                 .min_inner_size(880.0, 600.0)
                 .resizable(true)
                 .build()?;
-
-            if !warnings.is_empty() {
-                let msg = warnings.join(" ");
-                let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ");
-                let _ = win.eval(&format!(
-                    r#"window.addEventListener('load', function() {{
-                        var b = document.createElement('div');
-                        b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff0c2;color:#7a4b00;padding:8px 16px;font:13px/1.4 system-ui,sans-serif;border-bottom:1px solid #e8c96a';
-                        b.textContent = '{escaped}';
-                        document.body.prepend(b);
-                    }}, {{once:true}});"#
-                ));
-            }
 
             Ok(())
         })

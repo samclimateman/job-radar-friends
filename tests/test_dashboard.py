@@ -184,6 +184,43 @@ def test_restore_database_from_backup_zip(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_restore_database_rejects_invalid_sqlite(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "live"))
+    init_db()
+    invalid_path = tmp_path / "invalid.sqlite"
+    invalid_path.write_text("not sqlite")
+
+    assert restore_database(str(invalid_path)) is False
+    assert "could not be read as SQLite" in get_state("last_restore_error", "")
+    get_settings.cache_clear()
+
+
+def test_restore_database_creates_pre_restore_backup(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "old"))
+    init_db()
+    old_source = add_source("https://jobs.lever.co/old", organization="Old")
+
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "new"))
+    get_settings.cache_clear()
+    init_db()
+    new_source = add_source("https://jobs.lever.co/new", organization="New")
+    backup_path = tmp_path / "new.sqlite"
+    get_settings().db_path.replace(backup_path)
+
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path / "old"))
+    get_settings.cache_clear()
+
+    assert restore_database(str(backup_path)) is True
+    pre_restore = get_state("last_pre_restore_backup", "")
+    assert pre_restore.endswith(".zip")
+    assert (tmp_path / "old" / "backups").exists()
+    assert execute("SELECT url FROM sources WHERE id = ?", (new_source.id,))[0]["url"] == "https://jobs.lever.co/new"
+    assert not execute("SELECT url FROM sources WHERE id = ?", (old_source.id,))
+    get_settings.cache_clear()
+
+
 def test_source_health_center_and_source_actions(tmp_path, monkeypatch):
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))

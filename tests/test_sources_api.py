@@ -15,7 +15,15 @@ from job_radar.db.client import execute, init_db
 from job_radar.ingestion.source_store import add_source
 
 
+def _allow_public_dns(monkeypatch):
+    def fake_getaddrinfo(host, port, type=None):
+        return [(None, None, None, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr("job_radar.ingestion.source_detection.socket.getaddrinfo", fake_getaddrinfo)
+
+
 def test_update_source_redetects_and_saves_notes(tmp_path, monkeypatch):
+    _allow_public_dns(monkeypatch)
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
     init_db()
@@ -33,6 +41,27 @@ def test_update_source_redetects_and_saves_notes(tmp_path, monkeypatch):
     assert row["platform"] == "lever"
     assert row["status"] == "active"
     assert row["notes"] == "Important source"
+    get_settings.cache_clear()
+
+
+def test_update_source_rejects_private_dns_resolution(tmp_path, monkeypatch):
+    def fake_getaddrinfo(host, port, type=None):
+        return [(None, None, None, "", ("127.0.0.1", 0))]
+
+    monkeypatch.setattr("job_radar.ingestion.source_detection.socket.getaddrinfo", fake_getaddrinfo)
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    init_db()
+    source = add_source("https://example.org/careers", "Example")
+
+    with pytest.raises(HTTPException) as exc:
+        update_source(source.id, SourceUpdate(
+            organization="Example",
+            url="https://careers.example.org",
+            notes=None,
+        ))
+
+    assert exc.value.status_code == 422
     get_settings.cache_clear()
 
 
@@ -87,6 +116,7 @@ def test_delete_source_only_when_no_jobs(tmp_path, monkeypatch):
 
 
 def test_source_health_includes_editable_fields(tmp_path, monkeypatch):
+    _allow_public_dns(monkeypatch)
     get_settings.cache_clear()
     monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
     init_db()

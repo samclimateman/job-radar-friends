@@ -150,7 +150,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             organization = _first(form, "organization") or None
             for url in _split_urls(_first(form, "urls")):
                 try:
-                    add_source(url, organization=organization)
+                    add_source(url, organization=organization, resolve_dns=True)
                 except SourceUrlError as exc:
                     set_state("source_form_error", str(exc))
             self._redirect("/")
@@ -244,7 +244,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             manual = _first(form, "manual") == "1"
             if url.strip():
                 try:
-                    source = add_source(url.strip(), organization=organization)
+                    source = add_source(url.strip(), organization=organization, resolve_dns=True)
                     if manual:
                         from job_radar.ingestion.source_store import set_source_needs_review
                         set_source_needs_review(source.id)

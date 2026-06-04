@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 import job_radar.ingestion.response_cache as response_cache
 from job_radar.db.client import execute, init_db
+from job_radar.ingestion.source_detection import normalize_source_url
 from job_radar.ingestion.source_store import StoredSource
 from job_radar.ingestion.sources.ashby import AshbyScraper
 from job_radar.ingestion.sources.greenhouse import GreenhouseScraper
@@ -103,6 +104,7 @@ def _ingest_source(run_id: str, source: StoredSource) -> SourceIngestionResult:
         return SourceIngestionResult(source.id, source.url, source.platform, False, error=error)
 
     try:
+        normalize_source_url(source.url, resolve_dns=True)
         fetch_start = time.monotonic()
         jobs = _fetch_jobs(scraper_cls, source)
         fetch_ms = int((time.monotonic() - fetch_start) * 1000)

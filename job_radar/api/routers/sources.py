@@ -156,7 +156,7 @@ def update_source(source_id: str, body: SourceUpdate):
         raise HTTPException(status_code=404, detail="Source not found")
 
     try:
-        url = normalize_source_url(body.url)
+        url = normalize_source_url(body.url, resolve_dns=True)
     except SourceUrlError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 

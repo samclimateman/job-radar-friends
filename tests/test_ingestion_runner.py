@@ -1,11 +1,21 @@
 from unittest.mock import patch
 
+import pytest
+
 from job_radar.config.settings import get_settings
 from job_radar.db.client import execute
 from job_radar.ingestion.runner import _fetch_jobs, run_ingestion
 from job_radar.ingestion.source_store import StoredSource, add_source
 from job_radar.ingestion.sources.playwright_base import PlaywrightBaseScraper
 from job_radar.scoring.store import save_rubric
+
+
+@pytest.fixture(autouse=True)
+def allow_public_dns(monkeypatch):
+    monkeypatch.setattr(
+        "job_radar.ingestion.source_detection.socket.getaddrinfo",
+        lambda host, port, type=None: [(None, None, None, "", ("93.184.216.34", 0))],
+    )
 
 
 class MockResponse:

@@ -20,6 +20,10 @@ def disable_response_cache(monkeypatch):
         "job_radar.ingestion.runner.response_cache.is_unchanged",
         lambda *_: False,
     )
+    monkeypatch.setattr(
+        "job_radar.ingestion.source_detection.socket.getaddrinfo",
+        lambda host, port, type=None: [(None, None, None, "", ("93.184.216.34", 0))],
+    )
 
 
 class MockResponse:
