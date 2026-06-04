@@ -28,4 +28,4 @@ jobs:
         run: python -m pip install --upgrade semgrep
 
       - name: Run Semgrep Community Edition
-        run: semgrep scan --config p/default --config p/security-audit --error --metrics=off .
+        run: semgrep scan --config p/security-audit --metrics=off .

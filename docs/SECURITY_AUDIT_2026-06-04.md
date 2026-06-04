@@ -218,7 +218,7 @@ Limitations:
 The proposed open-source security stack makes sense for this repo, with sequencing:
 
 - Do now: Dependabot for Python, npm, Cargo, and GitHub Actions. This repo has `pyproject.toml`, `frontend/package-lock.json`, and `src-tauri/Cargo.lock`, so automated dependency update PRs are a strong fit with low maintenance cost.
-- Done next: Gitleaks for secret detection, OSV-Scanner for dependency vulnerability scanning, and Semgrep Community Edition for Python/TypeScript/Rust static analysis are configured in GitHub Actions.
+- Done next: Gitleaks for secret detection, OSV-Scanner for dependency vulnerability scanning, and Semgrep Community Edition for Python/TypeScript/Rust static analysis are configured in GitHub Actions. Semgrep starts as report-only while the initial findings backlog is triaged.
 - Defer: Trivy until the repo has a container/image/IaC surface or a pinned/action-hardened CI plan. OSV is a cleaner first dependency scanner for this app.
 - Defer: osquery/FleetDM. Useful for developer-machine visibility, but it is endpoint management rather than app hardening and does not belong in the public app repo.
 - Keep in mind: GitHub Actions themselves are supply-chain dependencies. Add scanners deliberately, restrict workflow permissions, and prefer pinned action SHAs once the workflow set stabilizes.
@@ -227,7 +227,7 @@ The proposed open-source security stack makes sense for this repo, with sequenci
 
 1. Add redirect-time checks for any future scraper that follows arbitrary user-supplied URLs.
 2. Design a real per-launch local API token with secure Tauri-to-React bootstrap.
-3. Watch the first Gitleaks, OSV-Scanner, and Semgrep CI runs and tune only real false positives.
+3. Triage initial Semgrep findings: XML parsing in Personio, non-cryptographic SHA1 identifier hashing, and controlled dynamic SQL fragments.
 4. Add `pip-audit` and `cargo-audit` to the repeatable local security checklist.
 5. Consider a Tauri file picker/token flow for restore instead of free-text paths.
 
