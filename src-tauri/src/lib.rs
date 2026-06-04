@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 const PORT: u16 = 8766;
+type ServerProcess = Arc<Mutex<Option<std::process::Child>>>;
 
 fn is_port_open(port: u16) -> bool {
     std::net::TcpStream::connect(("127.0.0.1", port)).is_ok()
@@ -128,6 +129,15 @@ fn start_server() -> (Option<std::process::Child>, Vec<String>) {
     (child, vec![])
 }
 
+fn stop_server(server_proc: &ServerProcess) {
+    if let Ok(mut guard) = server_proc.lock() {
+        if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
 /// Returns the Job Radar data directory (~/.job-radar)
 fn dirs_path() -> std::path::PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
@@ -157,10 +167,12 @@ fn encode_query_component(value: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let server_proc: Arc<Mutex<Option<std::process::Child>>> = Arc::new(Mutex::new(None));
+    let server_proc: ServerProcess = Arc::new(Mutex::new(None));
     let server_proc_setup = server_proc.clone();
+    let server_proc_window = server_proc.clone();
+    let server_proc_exit = server_proc.clone();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![open_external])
         .setup(move |app| {
             let (child, warnings) = start_server();
@@ -190,14 +202,18 @@ pub fn run() {
         })
         .on_window_event(move |_window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                if let Ok(mut guard) = server_proc.lock() {
-                    if let Some(ref mut child) = *guard {
-                        let _ = child.kill();
-                        let _ = child.wait();
-                    }
-                }
+                stop_server(&server_proc_window);
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(move |_app_handle, event| {
+        if matches!(
+            event,
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+        ) {
+            stop_server(&server_proc_exit);
+        }
+    });
 }

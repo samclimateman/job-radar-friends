@@ -104,7 +104,7 @@ Run this before sending a DMG to a tester:
 - Packaged frontend served built React HTML and assets.
 - Packaged data routes served diagnostics and a valid backup ZIP.
 - Initial launch correctly refused to attach when port `8766` was held by another local process.
-- Follow-up: AppleScript quit did not release the packaged process in this run; manual kill cleared `8766`. Re-test normal Finder quit during next packaging pass.
+- 2026-06-04 follow-up: rebuilt app after lifecycle cleanup change, launched the packaged app, confirmed `GET /api/health`, quit via macOS AppleScript, and confirmed port `8766` was released.
 
 ## Not Yet Production-Grade
 
