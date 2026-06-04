@@ -174,6 +174,9 @@ export interface OnboardingAnswers {
   current_role: string
   ideal_role: string
   locations: string[]
+  location_policy: 'flexible' | 'prefer' | 'strict'
+  remote_policy: 'any_remote' | 'target_region_remote' | 'no_remote_only'
+  unknown_location_policy: 'keep' | 'review' | 'exclude'
   avoid_constraints: string
   target_titles: string
   themes: string[]

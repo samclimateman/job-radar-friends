@@ -20,9 +20,68 @@ class ScoreResult:
         return bool(self.excluded)
 
 
+@dataclass(frozen=True)
+class LocationDecision:
+    decision: str
+    matched: list[str] = field(default_factory=list)
+    reason: str = ""
+    downgrade: float = 0.0
+
+
 def _contains_any(text: str, needles: list[str]) -> list[str]:
     lower = text.lower()
     return [needle for needle in needles if needle and needle.lower() in lower]
+
+
+def _is_remote_only(location: str) -> bool:
+    lower = location.lower().strip()
+    if not lower:
+        return False
+    remote_markers = ("remote", "work from home", "wfh", "anywhere")
+    if not any(marker in lower for marker in remote_markers):
+        return False
+    office_markers = ("hybrid", "/", ",", " in ", "based")
+    return not any(marker in lower for marker in office_markers)
+
+
+def location_decision(job: ScrapedJob, rubric: ScoringRubric) -> LocationDecision:
+    location = job.location or ""
+    target_matches = _contains_any(location, rubric.target_locations)
+    remote_only = _is_remote_only(location)
+    unknown = not location.strip() or location.strip().lower() in {
+        "multiple locations", "various", "various locations", "global", "worldwide"
+    } or location.strip().lower().endswith(" locations")
+
+    if target_matches:
+        return LocationDecision(
+            decision="keep",
+            matched=target_matches,
+            reason="target_location",
+        )
+
+    if remote_only:
+        if rubric.remote_policy == "any_remote":
+            return LocationDecision(decision="keep", reason="plain_remote_allowed")
+        if rubric.remote_policy == "no_remote_only":
+            return LocationDecision(decision="exclude", reason="remote_only_excluded")
+        if rubric.location_policy == "flexible":
+            return LocationDecision(decision="keep", reason="remote_policy_mismatch", downgrade=0.05)
+        return LocationDecision(decision="exclude", reason="remote_policy_mismatch")
+
+    if unknown:
+        if rubric.unknown_location_policy == "exclude":
+            return LocationDecision(decision="exclude", reason="unknown_location_excluded")
+        if rubric.unknown_location_policy == "review":
+            return LocationDecision(decision="review", reason="unknown_location_review", downgrade=0.1)
+        if rubric.location_policy == "strict":
+            return LocationDecision(decision="review", reason="strict_unknown_location", downgrade=0.1)
+        return LocationDecision(decision="keep", reason="unknown_location_kept")
+
+    if rubric.location_policy == "strict":
+        return LocationDecision(decision="exclude", reason="strict_location_mismatch")
+    if rubric.location_policy == "prefer":
+        return LocationDecision(decision="keep", reason="location_outside_target", downgrade=0.15)
+    return LocationDecision(decision="keep", reason="location_not_targeted")
 
 
 def score_job(job: ScrapedJob, rubric: ScoringRubric) -> ScoreResult:
@@ -45,10 +104,20 @@ def score_job(job: ScrapedJob, rubric: ScoringRubric) -> ScoreResult:
     matched: list[str] = []
     downgraded: list[str] = []
 
-    location_matches = _contains_any(job.location or "", rubric.target_locations)
-    if location_matches:
+    loc = location_decision(job, rubric)
+    if loc.decision == "exclude":
+        return ScoreResult(
+            score=0.0,
+            excluded=[f"excluded because: {loc.reason}"],
+        )
+    if loc.matched:
         raw += weights.location
-        matched.extend(f"matched location: {item}" for item in location_matches)
+        matched.extend(f"matched location: {item}" for item in loc.matched)
+    elif loc.reason:
+        if loc.decision == "review":
+            downgraded.append(f"needs review: {loc.reason}")
+        elif loc.downgrade:
+            downgraded.append(f"downgraded because: {loc.reason}")
 
     role_matches = _contains_any(job.title, rubric.role_types)
     if role_matches:
@@ -71,7 +140,7 @@ def score_job(job: ScrapedJob, rubric: ScoringRubric) -> ScoreResult:
         matched.extend(f"matched keyword: {item}" for item in keyword_matches)
 
     negative_matches = _contains_any(haystack, rubric.negative_keywords)
-    penalty = min(0.35, 0.1 * len(negative_matches))
+    penalty = min(0.35, 0.1 * len(negative_matches) + loc.downgrade)
     if negative_matches:
         downgraded.extend(f"downgraded because: {item}" for item in negative_matches)
 

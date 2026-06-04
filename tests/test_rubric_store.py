@@ -10,6 +10,9 @@ def test_save_rubric_sets_active_strategy(tmp_path, monkeypatch):
     save_rubric(
         strategy_narrative="Strategy roles in London",
         target_locations="London\nBerlin",
+        location_policy="prefer",
+        remote_policy="no_remote_only",
+        unknown_location_policy="exclude",
         role_types="strategy, policy",
         dealbreakers="unpaid",
     )
@@ -19,6 +22,9 @@ def test_save_rubric_sets_active_strategy(tmp_path, monkeypatch):
     _, rubric = loaded
     assert rubric.strategy_narrative == "Strategy roles in London"
     assert rubric.target_locations == ["London", "Berlin"]
+    assert rubric.location_policy == "prefer"
+    assert rubric.remote_policy == "no_remote_only"
+    assert rubric.unknown_location_policy == "exclude"
     assert rubric.role_types == ["strategy", "policy"]
     assert rubric.dealbreakers == ["unpaid"]
     get_settings.cache_clear()

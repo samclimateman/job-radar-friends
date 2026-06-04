@@ -82,6 +82,15 @@ Unknown-location policy should be explicit:
 
 This keeps the public product configurable while allowing strict users to say, for example, "I only want London, Berlin, Brussels, or remote UK/EU."
 
+Implemented in beta:
+
+- Users can choose `Flexible`, `Prefer`, or `Strict`.
+- Users can choose `Any remote`, `Target-region remote`, or `No remote-only`.
+- Users can choose whether unknown locations are kept, reviewed, or excluded.
+- `No remote-only` excludes plain remote roles regardless of location strictness.
+- Existing users default to `Flexible`, `Any remote`, and `Keep unknown` so old behavior is preserved.
+- Scoring explanations include matched, downgraded, review, or exclusion reasons.
+
 ### 4. Source Reliability
 
 Users will forgive broken sources if the app explains what happened and offers a path forward.
@@ -162,7 +171,7 @@ Later:
 
 Highest-leverage actions that are realistic now:
 
-1. Add a configurable location policy to onboarding/settings.
+1. Add a configurable location policy to onboarding/settings. [done]
 2. Make scoring/exclusion explanations clearer in the job detail panel.
 3. Add a privacy/local-first panel to onboarding.
 4. Add a diagnostics/feedback link for beta users.
@@ -172,10 +181,9 @@ Highest-leverage actions that are realistic now:
 
 ## Suggested Next Sprint
 
-1. Implement location policy fields in the rubric model.
-2. Surface those fields in onboarding and settings.
-3. Apply location policy during scoring and exclusion.
-4. Add tests for flexible/prefer/strict modes.
+1. Implement location policy fields in the rubric model. [done]
+2. Surface those fields in onboarding and settings. [done]
+3. Apply location policy during scoring and exclusion. [done]
+4. Add tests for flexible/prefer/strict modes. [done]
 5. Improve job detail explanations so users can see how location policy affected the result.
 6. Update docs and beta feedback prompts.
-

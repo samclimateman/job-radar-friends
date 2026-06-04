@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -33,6 +33,9 @@ class OnboardingAnswers(BaseModel):
     current_role: str = ""
     ideal_role: str = ""
     locations: list[str] = Field(default_factory=list)
+    location_policy: Literal["flexible", "prefer", "strict"] = "flexible"
+    remote_policy: Literal["any_remote", "target_region_remote", "no_remote_only"] = "any_remote"
+    unknown_location_policy: Literal["keep", "review", "exclude"] = "keep"
     avoid_constraints: str = ""
     target_titles: str = ""
     themes: list[str] = Field(default_factory=list)
@@ -129,6 +132,9 @@ def complete_onboarding(answers: OnboardingAnswers) -> dict[str, Any]:
     save_rubric(
         strategy_narrative=strategy,
         target_locations="\n".join(answers.locations),
+        location_policy=answers.location_policy,
+        remote_policy=answers.remote_policy,
+        unknown_location_policy=answers.unknown_location_policy,
         role_types=answers.target_titles,
         positive_keywords="\n".join(themes),
         negative_keywords="\n".join([*blocked_terms, *role_avoid]),

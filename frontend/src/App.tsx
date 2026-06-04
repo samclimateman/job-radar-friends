@@ -119,6 +119,26 @@ function stripHtml(html: string): string {
 
 function fmtScore(n: number) { return n > 0 ? Math.round(n).toString() : '–' }
 
+type ScoreExplanation = {
+  matched?: string[]
+  downgraded?: string[]
+  excluded?: string[]
+}
+
+function parseScoreExplanation(raw: string | null | undefined): ScoreExplanation | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as ScoreExplanation
+    const hasContent = ['matched', 'downgraded', 'excluded'].some(key => {
+      const items = parsed[key as keyof ScoreExplanation]
+      return Array.isArray(items) && items.length > 0
+    })
+    return hasContent ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 function sortValue(job: Job, col: SortCol): string | number {
   switch (col) {
     case 'title':               return job.title.toLowerCase()
@@ -187,6 +207,40 @@ function UpdateBanner({ version, downloadUrl, onDismiss }: {
         className="ml-auto text-amber-500 hover:text-amber-700 text-xs font-medium transition-colors">
         Dismiss
       </button>
+    </div>
+  )
+}
+
+function ScoreExplanationList({ explanation }: { explanation: ScoreExplanation | null }) {
+  if (!explanation) return null
+
+  const groups: { key: keyof ScoreExplanation; label: string; tone: string }[] = [
+    { key: 'matched', label: 'Matched', tone: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+    { key: 'downgraded', label: 'Watch', tone: 'bg-amber-50 text-amber-700 border-amber-100' },
+    { key: 'excluded', label: 'Excluded', tone: 'bg-red-50 text-red-700 border-red-100' },
+  ]
+
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-100">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Why this score</p>
+      <div className="space-y-2">
+        {groups.map(group => {
+          const items = explanation[group.key] ?? []
+          if (items.length === 0) return null
+          return (
+            <div key={group.key} className="flex flex-wrap items-start gap-1.5">
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${group.tone}`}>
+                {group.label}
+              </span>
+              {items.map(item => (
+                <span key={`${group.key}-${item}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-md px-2 py-0.5">
+                  {item.replace(/_/g, ' ')}
+                </span>
+              ))}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -668,6 +722,7 @@ function DetailPanel({ jobId, onClose, onStatusChange, onDismiss }: {
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
   const [noteSaved, setNoteSaved] = useState(false)
+  const scoreExplanation = parseScoreExplanation(detail?.explanation_json)
 
   useEffect(() => {
     setLoading(true); setDetail(null); setNoteText(''); setNoteSaved(false)
@@ -743,6 +798,7 @@ function DetailPanel({ jobId, onClose, onStatusChange, onDismiss }: {
               <ScoreBar label="Narrative fit" value={detail.narrative_score} />
               <ScoreBar label="Policy fit" value={detail.policy_score} />
             </div>
+            <ScoreExplanationList explanation={scoreExplanation} />
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Workflow status</p>
               <div className="flex flex-wrap gap-1.5">
@@ -1835,6 +1891,9 @@ const DEFAULT_ONBOARDING: OnboardingAnswers = {
   current_role: '',
   ideal_role: '',
   locations: [],
+  location_policy: 'flexible',
+  remote_policy: 'any_remote',
+  unknown_location_policy: 'keep',
   avoid_constraints: '',
   target_titles: '',
   themes: [],
@@ -1861,6 +1920,24 @@ const LOCATION_CHIPS = [
   'Geneva', 'Zurich', 'Paris', 'Remote Europe', 'Hybrid Europe',
 ]
 
+const LOCATION_POLICY_OPTIONS = [
+  { value: 'flexible', label: 'Flexible' },
+  { value: 'prefer', label: 'Prefer' },
+  { value: 'strict', label: 'Strict' },
+] as const
+
+const REMOTE_POLICY_OPTIONS = [
+  { value: 'any_remote', label: 'Any remote' },
+  { value: 'target_region_remote', label: 'Target-region remote' },
+  { value: 'no_remote_only', label: 'No remote-only' },
+] as const
+
+const UNKNOWN_LOCATION_OPTIONS = [
+  { value: 'keep', label: 'Keep unknown' },
+  { value: 'review', label: 'Review unknown' },
+  { value: 'exclude', label: 'Exclude unknown' },
+] as const
+
 const THEME_CHIPS = [
   'International affairs', 'Foreign policy', 'Geopolitics', 'Energy security',
   'Industrial strategy', 'Economic security', 'Critical infrastructure',
@@ -1885,9 +1962,12 @@ function generatedStrategy(a: OnboardingAnswers) {
   const blockers = [...lines(a.blocked_terms), ...a.role_types_to_avoid]
   const prioritize = [...titles.slice(0, 6), ...themes.slice(0, 8)].join(', ') || 'roles matching your search criteria'
   const locations = a.locations.join(', ') || 'your preferred locations'
+  const locationPolicy = LOCATION_POLICY_OPTIONS.find(o => o.value === a.location_policy)?.label ?? 'Flexible'
+  const remotePolicy = REMOTE_POLICY_OPTIONS.find(o => o.value === a.remote_policy)?.label ?? 'Any remote'
   const downgrade = blockers.slice(0, 10).join(', ') || 'roles outside your stated criteria'
   return [
     `Prioritize ${prioritize} in ${locations}.`,
+    `Location policy: ${locationPolicy}. Remote policy: ${remotePolicy}.`,
     `Downgrade or flag ${downgrade}.`,
     'Monitor selected organizations first. Prefer verified vacancies pages. Flag broken or uncertain sources instead of hiding them.',
   ].join('\n\n')
@@ -1910,6 +1990,12 @@ ${a.ideal_role || 'Not specified'}
 
 Target locations:
 ${a.locations.join(', ') || 'Not specified'}
+
+Location policy:
+${LOCATION_POLICY_OPTIONS.find(o => o.value === a.location_policy)?.label ?? 'Flexible'}
+
+Remote policy:
+${REMOTE_POLICY_OPTIONS.find(o => o.value === a.remote_policy)?.label ?? 'Any remote'}
 
 Target job titles:
 ${a.target_titles || 'Not specified'}
@@ -2030,6 +2116,60 @@ function ChipToggle({ label, active, onToggle }: { label: string; active: boolea
     >
       {label}
     </button>
+  )
+}
+
+function PolicySegment<T extends string>({ options, value, onChange }: {
+  options: readonly { value: T; label: string }[]
+  value: T
+  onChange: (value: T) => void
+}) {
+  return (
+    <div className="inline-flex flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
+      {options.map(option => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            value === option.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function LocationPolicyControls({ answers, setAnswer }: {
+  answers: OnboardingAnswers
+  setAnswer: <K extends keyof OnboardingAnswers>(key: K, value: OnboardingAnswers[K]) => void
+}) {
+  const strictWithoutLocations = answers.location_policy === 'strict' && answers.locations.length === 0
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Location policy</p>
+        <PolicySegment options={LOCATION_POLICY_OPTIONS} value={answers.location_policy}
+          onChange={value => setAnswer('location_policy', value)} />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Remote policy</p>
+        <PolicySegment options={REMOTE_POLICY_OPTIONS} value={answers.remote_policy}
+          onChange={value => setAnswer('remote_policy', value)} />
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Unknown locations</p>
+        <PolicySegment options={UNKNOWN_LOCATION_OPTIONS} value={answers.unknown_location_policy}
+          onChange={value => setAnswer('unknown_location_policy', value)} />
+      </div>
+      {strictWithoutLocations && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Strict mode needs at least one target location.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -2185,6 +2325,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
   const validSources = answers.sources.filter(s => s.url.trim()).length
   const canContinue = (() => {
     if (step === 1) return !!answers.name.trim()
+    if (step === 5 && answers.location_policy === 'strict' && answers.locations.length === 0) return false
     if (step === 7) return validSources > 0
     if (step === 9) return validSources > 0
     return true
@@ -2288,6 +2429,7 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
                     onToggle={() => toggleList('locations', loc)} />
                 ))}
               </div>
+              <LocationPolicyControls answers={answers} setAnswer={setAnswer} />
               <input
                 value={answers.avoid_constraints}
                 onChange={e => setAnswer('avoid_constraints', e.target.value)}
@@ -2646,6 +2788,9 @@ function SettingsView({ onboarding, onSaved }: { onboarding: OnboardingState | n
                   onToggle={() => toggleList('locations', loc)} />
               ))}
             </div>
+          </SettingsField>
+          <SettingsField label="Location policy">
+            <LocationPolicyControls answers={answers} setAnswer={setAnswer} />
           </SettingsField>
           <SettingsField label="Location constraints" hint="Anything to avoid, e.g. no full relocation.">
             <input value={answers.avoid_constraints} onChange={e => setAnswer('avoid_constraints', e.target.value)}

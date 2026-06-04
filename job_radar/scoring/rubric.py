@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -23,6 +25,9 @@ class RubricWeights(BaseModel):
 class ScoringRubric(BaseModel):
     strategy_narrative: str = ""
     target_locations: list[str] = Field(default_factory=list)
+    location_policy: Literal["flexible", "prefer", "strict"] = "flexible"
+    remote_policy: Literal["any_remote", "target_region_remote", "no_remote_only"] = "any_remote"
+    unknown_location_policy: Literal["keep", "review", "exclude"] = "keep"
     preferred_industries: list[str] = Field(default_factory=list)
     role_types: list[str] = Field(default_factory=list)
     seniority: list[str] = Field(default_factory=list)

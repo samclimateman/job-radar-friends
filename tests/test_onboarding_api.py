@@ -37,6 +37,9 @@ def test_onboarding_completion_saves_sources_and_rubric(tmp_path, monkeypatch):
         current_role="Policy Manager",
         ideal_role="Strategy work on energy security.",
         locations=["Brussels", "Berlin"],
+        location_policy="strict",
+        remote_policy="target_region_remote",
+        unknown_location_policy="review",
         target_titles="Policy Lead\nStrategy Manager",
         themes=["Energy security", "Industrial strategy"],
         sources=[
@@ -73,6 +76,9 @@ def test_onboarding_completion_saves_sources_and_rubric(tmp_path, monkeypatch):
     assert loaded is not None
     _, rubric = loaded
     assert rubric.target_locations == ["Brussels", "Berlin"]
+    assert rubric.location_policy == "strict"
+    assert rubric.remote_policy == "target_region_remote"
+    assert rubric.unknown_location_policy == "review"
     assert rubric.role_types == ["Policy Lead", "Strategy Manager"]
     assert "Energy security" in rubric.positive_keywords
     get_settings.cache_clear()
