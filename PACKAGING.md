@@ -94,6 +94,18 @@ Run this before sending a DMG to a tester:
 8. Relaunch and confirm existing data persists.
 9. Note any Gatekeeper/right-click instructions needed by the tester.
 
+### Latest Packaged App Smoke Test
+
+2026-06-04 CSP smoke test:
+
+- `make build-app` completed successfully.
+- Packaged app launched from `src-tauri/target/release/bundle/macos/Job Radar.app`.
+- Packaged backend served `GET /api/health`.
+- Packaged frontend served built React HTML and assets.
+- Packaged data routes served diagnostics and a valid backup ZIP.
+- Initial launch correctly refused to attach when port `8766` was held by another local process.
+- Follow-up: AppleScript quit did not release the packaged process in this run; manual kill cleared `8766`. Re-test normal Finder quit during next packaging pass.
+
 ## Not Yet Production-Grade
 
 - No Developer ID notarization.
