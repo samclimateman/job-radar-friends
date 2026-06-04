@@ -33,7 +33,7 @@ Full system notes (browser scraper rules, concurrency model) in [SYSTEM.md](SYST
 ```bash
 make build-app    # build signed .app bundle
 make build-dmg    # build signed .app and local DMG
-make test         # run test suite (173 tests, offline as of 2026-06-03)
+make test         # run test suite (195 tests, offline as of 2026-06-04)
 make public-check # private-marker scan + Ruff + pytest + frontend build
 make release-check # full public gate before packaging/release
 ```
@@ -44,7 +44,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 
 ## Current State (update each session)
 
-**Last updated:** 2026-06-03
+**Last updated:** 2026-06-04
 
 ### Phase history
 - **Sprint 1–3:** Tauri shell, RSS connector, lifecycle tracking, confidence scoring, dashboard surfaces, source packs
@@ -79,6 +79,15 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, frontend package metadata, and the React update-banner `CURRENT_VERSION`; `make version-bump-patch|minor|major` updates them together
 - Local mutation protection rejects cross-site browser POST/PUT/PATCH/DELETE requests on the FastAPI and legacy HTML surfaces
 
+### What changed 2026-06-04
+- Live public beta is `v0.1.3`; downloadable DMG is published at `https://github.com/samclimateman/job-radar-friends/releases/tag/v0.1.3`
+- Built, verified, and uploaded `Job.Radar.dmg`; app signature and DMG checksum passed
+- Security automation added: Dependabot, Gitleaks, OSV Scanner, and Semgrep GitHub Actions
+- Hardened beta security controls: Tauri CSP, startup-warning eval removal, DNS checks for source URLs, restore pre-backup/integrity validation, local mutation protection
+- Hardened Personio XML parsing with `defusedxml` and changed description-change hashing from SHA1 to SHA-256
+- Added configurable location policy, trust/support/data settings, diagnostics bundle, security audit report, product readiness plan, and beta feedback/release docs
+- Merged the first Dependabot frontend dependency PR after local `public_check` validation; GitHub security workflows are green
+
 ### What changed 2026-06-03
 - Onboarding: copy edits steps 0/1/2, gate bug fixed, sidebar step nav + autosave, live first-scan progress
 - Settings tab: full post-onboarding editor for name, criteria, themes, strategy
@@ -90,16 +99,15 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Local request protection added for browser mutation endpoints
 
 ### What's next (prioritised plan)
-1. **Ship DMG to first beta user** — bump latest-version.json to 0.2.0, send the DMG
-2. **Settings editor** — done ✓
-3. **Live scan progress** — done ✓
-4. **Port conflict** — kill_port reverted from lib.rs; shows warning banner again if port conflict occurs
-5. **Source packs in React onboarding** — skipped by design (users too different)
-6. **Further polish** — based on beta user feedback
+1. **Collect beta feedback on v0.1.3** — install friction, onboarding clarity, source setup, scan trust, ranking quality, backup/export confidence
+2. **Triage remaining scanner backlog** — OSV Rust/Tauri dependency advisories and any Semgrep SQL suppressions that should become refactors
+3. **Consider local API token design** — only if there is a secure Tauri-to-React bootstrap path
+4. **Packaging maturity** — Developer ID signing/notarization, auto-update, rollback notes, and release checklist polish
+5. **Further UX/backend polish** — based on beta user feedback
 
 ### Known issues / debt
 - `requires_browser = True` must be set manually on any scraper calling `sync_playwright()` directly (not via `PlaywrightBaseScraper`) — runner uses this to throttle to 2 concurrent browser sessions
 - **Schema changes must be additive** — user databases at `~/.job-radar/job-radar.sqlite` persist across updates; never DROP, RENAME, or retype columns. New columns go in `schema.sql` + `_ensure_columns()` in `db/client.py`. Full rules in SYSTEM.md.
 - Build not notarised — first-launch requires right-click → Open
-- DMG launch was smoke-tested under automation: React shell, onboarding API, onboarding completion with blockers, needs-review source persistence, and blocklist persistence all passed. A full manual double-click/install test is still needed for window lifecycle, first scan with real URLs, and Gatekeeper behavior.
+- DMG launch was smoke-tested under automation: React shell, packaged backend, packaged frontend/assets, diagnostics, backup ZIP, and sidecar quit cleanup all passed. A full manual double-click/install test is still useful for real-user Gatekeeper behavior and first scan with real URLs.
 - Keep `README.md`, `SYSTEM.md`, `CLAUDE.md`, `PACKAGING.md`, and `PUBLISH_CHECKLIST.md` manually aligned after behavior changes; avoid dynamic counts unless they are verified during the session.
