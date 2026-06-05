@@ -1,5 +1,5 @@
 {
-  "version": "0.1.3",
-  "notes": "Adds security scanning, hardens Personio XML parsing, updates description hashing, and refreshes the downloadable beta DMG.",
+  "version": "0.1.4",
+  "notes": "Adds a visible beta feedback path with redacted diagnostics and a copyable report template for tester feedback.",
   "download_url": "https://github.com/samclimateman/job-radar-friends/releases"
 }

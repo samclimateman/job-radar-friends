@@ -25,9 +25,10 @@ type SortDir = 'asc' | 'desc'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const CURRENT_VERSION = '0.1.3'
+const CURRENT_VERSION = '0.1.4'
 const VERSION_CHECK_URL = 'https://raw.githubusercontent.com/samclimateman/job-radar-friends/main/latest-version.json'
 const FEEDBACK_URL = 'https://github.com/samclimateman/job-radar-friends/issues/new/choose'
+const DIAGNOSTICS_URL = '/api/data/diagnostics'
 
 const JOB_VIEWS = [
   { key: 'best', label: 'Best Fit' },
@@ -54,6 +55,26 @@ const STATUS_OPTIONS = [
 function displayStatus(status: string) {
   return STATUS_OPTIONS.find(o => o.value === status)?.label
     ?? status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function betaReportTemplate() {
+  return [
+    'Job Radar beta feedback',
+    '',
+    `App version: ${CURRENT_VERSION}`,
+    `Device/browser: ${navigator.userAgent}`,
+    '',
+    'What I was trying to do:',
+    '',
+    'What happened:',
+    '',
+    'What I expected:',
+    '',
+    'Can you reproduce it? yes / no / not sure',
+    '',
+    'Screenshot attached? yes / no',
+    'Diagnostics attached? yes / no',
+  ].join('\n')
 }
 
 const TABLE_COLS: { key: SortCol; label: string; sortable: boolean }[] = [
@@ -257,9 +278,9 @@ function ScoreExplanationList({ explanation }: { explanation: ScoreExplanation |
 
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 
-function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook, onSettings }: {
+function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebook, onSettings, onFeedback }: {
   stats: Stats | null; tab: AppTab; onTab: (t: AppTab) => void
-  appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void; onSettings: () => void
+  appTitle: string; onRefresh: () => void; refreshing: boolean; onNotebook: () => void; onSettings: () => void; onFeedback: () => void
 }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 text-sm flex-shrink-0 min-w-0">
@@ -294,6 +315,11 @@ function StatsBar({ stats, tab, appTitle, onTab, onRefresh, refreshing, onNotebo
         ) : <span className="text-slate-400 text-xs animate-pulse">Loading…</span>}
       </div>
       <div className="ml-auto flex gap-2">
+        <button
+          onClick={onFeedback}
+          className="px-3 py-1.5 rounded-md border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+          Feedback
+        </button>
         <button
           onClick={onNotebook}
           className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors
@@ -2797,6 +2823,18 @@ function DataSafetySettings({ inputCls }: { inputCls: string }) {
 }
 
 function TrustAndSupportSettings() {
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+
+  async function copyTemplate() {
+    try {
+      await navigator.clipboard.writeText(betaReportTemplate())
+      setCopyState('copied')
+      window.setTimeout(() => setCopyState('idle'), 2500)
+    } catch {
+      setCopyState('error')
+    }
+  }
+
   return (
     <>
       <SettingsSection title="Privacy & Security">
@@ -2807,20 +2845,35 @@ function TrustAndSupportSettings() {
         </div>
       </SettingsSection>
 
-      <SettingsSection title="Support / Beta Feedback">
-        <SettingsField label="Feedback">
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => openExternal(FEEDBACK_URL)}
-              className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
-              Send feedback
-            </button>
-            <a href="/api/data/diagnostics" className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-              Download diagnostics
-            </a>
-          </div>
-          <p className="text-xs text-slate-400 mt-2">Diagnostics include version/path/count metadata and source health summaries, but omit API keys, source URLs, notes, applications, and job descriptions.</p>
-        </SettingsField>
-      </SettingsSection>
+      <div id="beta-feedback" className="scroll-mt-4">
+        <SettingsSection title="Support / Beta Feedback">
+          <SettingsField label="Feedback">
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => openExternal(FEEDBACK_URL)}
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700">
+                  Report issue
+                </button>
+                <a href={DIAGNOSTICS_URL} className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                  Download diagnostics
+                </a>
+                <button onClick={copyTemplate}
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                  Copy report template
+                </button>
+              </div>
+              {copyState === 'copied' && (
+                <p className="text-xs text-emerald-600 mt-2">Report template copied.</p>
+              )}
+              {copyState === 'error' && (
+                <textarea readOnly value={betaReportTemplate()}
+                  className="mt-3 w-full min-h-44 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 font-mono" />
+              )}
+              <p className="text-xs text-slate-400 mt-2">Diagnostics include version/path/count metadata and source health summaries, but omit API keys, source URLs, notes, applications, and job descriptions.</p>
+            </div>
+          </SettingsField>
+        </SettingsSection>
+      </div>
     </>
   )
 }
@@ -3181,7 +3234,12 @@ export default function App() {
         onTab={t => { setTab(t); setSelectedId(null) }}
         onRefresh={handleRefresh} refreshing={refreshing}
         onNotebook={() => { setTab('notebook'); setSelectedId(null) }}
-        onSettings={() => { setTab('settings'); setSelectedId(null) }} />
+        onSettings={() => { setTab('settings'); setSelectedId(null) }}
+        onFeedback={() => {
+          setTab('settings')
+          setSelectedId(null)
+          window.setTimeout(() => document.getElementById('beta-feedback')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0)
+        }} />
       {serverError && (
         <div className="flex items-center gap-3 px-6 py-2.5 bg-red-50 border-b border-red-200 text-sm flex-shrink-0">
           <span className="text-red-700 font-medium">Job Radar can't reach its backend. Try restarting the app.</span>
