@@ -222,6 +222,7 @@ The proposed open-source security stack makes sense for this repo, with sequenci
 - Do now: Dependabot for Python, npm, Cargo, and GitHub Actions. This repo has `pyproject.toml`, `frontend/package-lock.json`, and `src-tauri/Cargo.lock`, so automated dependency update PRs are a strong fit with low maintenance cost.
 - Done next: Gitleaks for secret detection, OSV-Scanner for dependency vulnerability scanning, and Semgrep Community Edition for Python/TypeScript/Rust static analysis are configured in GitHub Actions. OSV and Semgrep start as report-only while initial findings are triaged.
 - Fixed from initial scanner triage: Personio XML now uses `defusedxml`; description-change hashing now uses SHA-256; controlled dynamic SQL fragments are marked for Semgrep with explicit allowlisted construction where practical.
+- Triaged: OSV Rust/Tauri advisories are documented in `docs/OSV_RUST_TAURI_TRIAGE_2026-06-05.md`. Current conclusion: no emergency macOS beta release needed; most findings are lockfile/Linux GTK3 noise or upstream Tauri utility dependencies.
 - Defer: Trivy until the repo has a container/image/IaC surface or a pinned/action-hardened CI plan. OSV is a cleaner first dependency scanner for this app.
 - Defer: osquery/FleetDM. Useful for developer-machine visibility, but it is endpoint management rather than app hardening and does not belong in the public app repo.
 - Keep in mind: GitHub Actions themselves are supply-chain dependencies. Add scanners deliberately, restrict workflow permissions, and prefer pinned action SHAs once the workflow set stabilizes.
@@ -230,7 +231,7 @@ The proposed open-source security stack makes sense for this repo, with sequenci
 
 1. Add redirect-time checks for any future scraper that follows arbitrary user-supplied URLs.
 2. Design a real per-launch local API token with secure Tauri-to-React bootstrap.
-3. Triage remaining scanner findings: OSV Rust/Tauri dependency advisories and any controlled dynamic SQL fragments that should be refactored instead of suppressed.
+3. Watch Dependabot/Tauri/Wry updates for a cleaner resolution of the triaged OSV Rust/Tauri advisories.
 4. Add `pip-audit` and `cargo-audit` to the repeatable local security checklist.
 5. Consider a Tauri file picker/token flow for restore instead of free-text paths.
 
