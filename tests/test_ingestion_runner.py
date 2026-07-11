@@ -118,6 +118,57 @@ def test_runner_records_failure_without_fabricating_jobs(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+def test_cache_skip_still_marks_missing_jobs(tmp_path, monkeypatch):
+    get_settings.cache_clear()
+    monkeypatch.setenv("JOB_RADAR_DATA_DIR", str(tmp_path))
+    source = add_source("https://job-boards.greenhouse.io/acme", organization="Acme")
+
+    both_jobs = {
+        "jobs": [
+            {
+                "id": 1,
+                "title": "Stale role",
+                "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/1",
+                "location": {"name": "London"},
+                "content": "<p>Old role.</p>",
+            },
+            {
+                "id": 2,
+                "title": "Current role",
+                "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/2",
+                "location": {"name": "London"},
+                "content": "<p>Current role.</p>",
+            },
+        ]
+    }
+    current_job = {"jobs": [both_jobs["jobs"][1]]}
+
+    with patch("job_radar.ingestion.sources.greenhouse.requests.get") as mock_get:
+        mock_get.return_value = MockResponse(both_jobs)
+        run_ingestion(source_id=source.id)
+
+    with patch("job_radar.ingestion.sources.greenhouse.requests.get") as mock_get, \
+         patch("job_radar.ingestion.runner.response_cache.is_unchanged", return_value=True):
+        mock_get.return_value = MockResponse(current_job)
+        result = run_ingestion(source_id=source.id)
+
+    assert result.sources_succeeded == 1
+    rows = execute(
+        """
+        SELECT title, missed_scans, lifecycle_status
+        FROM jobs
+        WHERE source_id = ?
+        ORDER BY title
+        """,
+        (source.id,),
+    )
+    assert rows == [
+        {"title": "Current role", "missed_scans": 0, "lifecycle_status": "active"},
+        {"title": "Stale role", "missed_scans": 1, "lifecycle_status": "new"},
+    ]
+    get_settings.cache_clear()
+
+
 def test_browser_scrapers_are_throttled(monkeypatch):
     source = StoredSource(
         id="source_1",

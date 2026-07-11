@@ -22,6 +22,7 @@ from job_radar.ingestion.sources.workable import WorkableScraper
 from job_radar.ingestion.store import (
     finish_run,
     finish_source_run,
+    mark_missing_source_jobs,
     start_run,
     start_source_run,
     store_jobs,
@@ -113,7 +114,8 @@ def _ingest_source(run_id: str, source: StoredSource) -> SourceIngestionResult:
         seen_urls = {j.source_url for j in jobs}
         url_hash = response_cache.compute_url_hash(seen_urls)
         if seen_urls and response_cache.is_unchanged(source.id, url_hash):
-            touch_source_jobs(source.id)
+            touch_source_jobs(source.id, seen_urls)
+            mark_missing_source_jobs(source.id, seen_urls)
             total_ms = int((time.monotonic() - total_start) * 1000)
             finish_source_run(
                 source_run_id, source,

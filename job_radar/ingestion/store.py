@@ -140,16 +140,23 @@ def finish_source_run(
     update_source_confidence(source.id, source.status)
 
 
-def touch_source_jobs(source_id: str) -> int:
+def touch_source_jobs(source_id: str, seen_urls: set[str]) -> int:
     """
-    Mark all live jobs for a source as still-active without re-upserting.
+    Mark the seen live jobs for a source as still-active without re-upserting.
 
     Called when response hashing shows the URL set is unchanged — we skip
-    normalize/score/upsert but still reset missed_scans so jobs don't drift
-    toward probably_closed.  Returns the number of rows updated.
+    normalize/score/upsert but still reset missed_scans for the jobs that are
+    still present. Stale rows from earlier scans must not be touched, otherwise
+    removed jobs stay active forever once the cache has learned the newer URL
+    set. Returns the number of rows updated when available.
     """
+    if not seen_urls:
+        return 0
+
+    placeholders = ",".join("?" for _ in seen_urls)
+    # semgrep:ignore python.sqlalchemy.security.sqlalchemy-execute-raw-query
     rows = execute(
-        """
+        f"""
         UPDATE jobs
         SET last_seen_at     = CURRENT_TIMESTAMP,
             missed_scans     = 0,
@@ -157,10 +164,17 @@ def touch_source_jobs(source_id: str) -> int:
         WHERE source_id      = ?
           AND is_live        = 1
           AND lifecycle_status NOT IN ('dead', 'excluded')
+          AND source_url IN ({placeholders})
         """,
-        (source_id,),
+        (source_id, *seen_urls),
     )
     return len(rows) if rows is not None else 0
+
+
+def mark_missing_source_jobs(source_id: str, seen_urls: set[str]) -> None:
+    """Advance lifecycle for live jobs missing from a successful source scan."""
+    if seen_urls:
+        _update_missing_jobs(source_id, seen_urls)
 
 
 def store_jobs(run_id: str, source: StoredSource, jobs: list[ScrapedJob]) -> StoreResult:

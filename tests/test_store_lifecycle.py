@@ -207,7 +207,7 @@ def test_touch_source_jobs_resets_missed_scans(tmp_path, monkeypatch):
     store_jobs(_run_id(src), src, [other])   # job/1 missed once
 
     assert _missed(src.id, job_url) == 1
-    touch_source_jobs(src.id)
+    touch_source_jobs(src.id, {job_url})
     assert _missed(src.id, job_url) == 0
     get_settings.cache_clear()
 
@@ -222,7 +222,7 @@ def test_touch_source_jobs_sets_active(tmp_path, monkeypatch):
         store_jobs(_run_id(src), src, [other])
 
     assert _lifecycle(src.id, job_url) == "probably_closed"
-    touch_source_jobs(src.id)
+    touch_source_jobs(src.id, {job_url})
     assert _lifecycle(src.id, job_url) == "active"
     get_settings.cache_clear()
 
@@ -237,7 +237,28 @@ def test_touch_does_not_revive_dead_jobs(tmp_path, monkeypatch):
         store_jobs(_run_id(src), src, [other])
 
     assert _lifecycle(src.id, job_url) == "dead"
-    touch_source_jobs(src.id)
+    touch_source_jobs(src.id, {job_url})
     # dead jobs have is_live=0, touch only affects live jobs
     assert _lifecycle(src.id, job_url) == "dead"
+    get_settings.cache_clear()
+
+
+def test_touch_source_jobs_only_touches_seen_urls(tmp_path, monkeypatch):
+    src = _source(tmp_path, monkeypatch)
+    stale_url = "https://jobs.example.com/stale"
+    current_url = "https://jobs.example.com/current"
+
+    store_jobs(_run_id(src), src, [
+        _job(url=stale_url, title="Stale role"),
+        _job(url=current_url, title="Current role"),
+    ])
+    store_jobs(_run_id(src), src, [_job(url=current_url, title="Current role")])
+
+    assert _missed(src.id, stale_url) == 1
+    assert _missed(src.id, current_url) == 0
+
+    touch_source_jobs(src.id, {current_url})
+
+    assert _missed(src.id, stale_url) == 1
+    assert _missed(src.id, current_url) == 0
     get_settings.cache_clear()
