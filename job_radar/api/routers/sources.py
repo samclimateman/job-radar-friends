@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from job_radar.db.client import execute
 from job_radar.ingestion.runner import run_ingestion
 from job_radar.ingestion.source_detection import SourceUrlError, detect_source, normalize_source_url
-from job_radar.ingestion.source_store import mark_manual_checked
+from job_radar.ingestion.source_store import add_source, mark_manual_checked
 
 router = APIRouter(tags=["sources"])
 
@@ -140,6 +140,32 @@ def get_source_health():
             "total_stale": 0,
         },
         "results": results,
+    }
+
+
+class SourceCreate(BaseModel):
+    organization: str | None = None
+    url: str
+
+
+@router.post("/sources")
+def create_source(body: SourceCreate):
+    try:
+        url = normalize_source_url(body.url, resolve_dns=True)
+    except SourceUrlError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    if execute("SELECT id FROM sources WHERE url = ?", (url,)):
+        raise HTTPException(status_code=409, detail="A source with that URL already exists")
+    source = add_source(url, body.organization.strip() if body.organization else None)
+    return {
+        "ok": True,
+        "source": {
+            "id": source.id,
+            "organization": source.organization,
+            "url": source.url,
+            "platform": source.platform,
+            "status": source.status,
+        },
     }
 
 
