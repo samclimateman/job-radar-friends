@@ -44,7 +44,7 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 
 ## Current State (update each session)
 
-**Last updated:** 2026-06-04
+**Last updated:** 2026-07-12
 
 ### Phase history
 - **Sprint 1–3:** Tauri shell, RSS connector, lifecycle tracking, confidence scoring, dashboard surfaces, source packs
@@ -78,6 +78,23 @@ Signing: ad-hoc signing in Makefile. Not notarised — friends need to right-cli
 - Release guardrail: `make release-check` runs the public gate before packaging/release
 - Version/name metadata is centralized through `VERSION`; `make version-check` verifies Python, Tauri/Rust, frontend package metadata, and the React update-banner `CURRENT_VERSION`; `make version-bump-patch|minor|major` updates them together
 - Local mutation protection rejects cross-site browser POST/PUT/PATCH/DELETE requests on the FastAPI and legacy HTML surfaces
+
+### What changed 2026-07-12 (branch: community-source-registry)
+- **Community source registry** shipped end to end. Public registry repo at
+  https://github.com/samclimateman/job-radar-sources holds declarative per-org packs
+  (`packs/<domain>.json`) plus a generated `index.json`, seeded with the 36 bundled-pack orgs.
+  Registry-side validation (`scripts/validate.py`, stdlib-only) and an issue-ops workflow that
+  turns "Submit a source" issues into validated PRs.
+- App side: `job_radar/source_packs/community.py` (ETag/TTL-cached index fetch to the user data
+  dir, offline-safe; domain/name lookup; share payload + prefilled-issue URL), `/api/community/*`
+  router (status, refresh, lookup with `already_added`, import, share), and `POST /api/sources`
+  for manual adds.
+- React: "Add organization" panel in the Sources tab (community suggestions + manual URL
+  fallback), community suggestion cards under onboarding step-7 rows, and a "Share" action on
+  working sources that previews the exact JSON before opening a prefilled GitHub issue.
+- Tests: `tests/test_community.py` (13 tests, mocked network). Registry workflows commit is
+  local-only in the registry repo pending `gh auth refresh -s workflow` (OAuth token lacks
+  workflow scope).
 
 ### What changed 2026-06-04
 - Live public beta is `v0.1.3`; downloadable DMG is published at `https://github.com/samclimateman/job-radar-friends/releases/tag/v0.1.3`

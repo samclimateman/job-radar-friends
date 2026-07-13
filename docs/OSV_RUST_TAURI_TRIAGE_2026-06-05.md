@@ -30,14 +30,14 @@ Commands run:
 
 ```bash
 gh run view 27001001658 --log
-/Users/sambowers/.cargo/bin/cargo search tauri --limit 3
-/Users/sambowers/.cargo/bin/cargo update --dry-run --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo update -p glib --dry-run --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo tree --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo tree -i glib --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo tree -i gtk --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo tree -i proc-macro-error --manifest-path src-tauri/Cargo.toml
-/Users/sambowers/.cargo/bin/cargo tree -i unic-ucd-ident --manifest-path src-tauri/Cargo.toml
+cargo search tauri --limit 3
+cargo update --dry-run --manifest-path src-tauri/Cargo.toml
+cargo update -p glib --dry-run --manifest-path src-tauri/Cargo.toml
+cargo tree --manifest-path src-tauri/Cargo.toml
+cargo tree -i glib --manifest-path src-tauri/Cargo.toml
+cargo tree -i gtk --manifest-path src-tauri/Cargo.toml
+cargo tree -i proc-macro-error --manifest-path src-tauri/Cargo.toml
+cargo tree -i unic-ucd-ident --manifest-path src-tauri/Cargo.toml
 ```
 
 Results:

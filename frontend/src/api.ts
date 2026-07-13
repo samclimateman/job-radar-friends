@@ -214,6 +214,51 @@ export interface DataLocation {
   database_exists: boolean
 }
 
+export interface CommunityPack {
+  schema_version: number
+  domain: string
+  organization: string
+  careers_url: string
+  platform: string
+  tags?: string[]
+  region?: string
+  last_verified?: string
+  confidence?: string
+  notes?: string
+  already_added?: boolean
+}
+
+export interface CommunityStatus {
+  available: boolean
+  pack_count: number
+  fetched_at: string | null
+  registry_url: string
+}
+
+export interface CommunitySharePayload {
+  schema_version: number
+  domain: string
+  organization: string
+  careers_url: string
+  platform: string
+  last_verified: string
+  confidence?: string
+}
+
+export interface CommunityShare {
+  payload: CommunitySharePayload
+  issue_url: string
+  domain_missing: boolean
+}
+
+export interface CreatedSource {
+  id: string
+  organization: string | null
+  url: string
+  platform: string
+  status: string
+}
+
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(BASE + path, window.location.origin)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
@@ -297,6 +342,16 @@ export const api = {
   completeOnboarding: (answers: OnboardingAnswers) =>
     post<OnboardingCompleteResult>('/onboarding/complete', answers),
   dataLocation: () => get<DataLocation>('/data/location'),
+  addSource: (organization: string | null, url: string) =>
+    post<{ ok: boolean; source: CreatedSource }>('/sources', { organization, url }),
+  communityStatus: () => get<CommunityStatus>('/community/status'),
+  communityRefresh: () => post<{ available: boolean; pack_count: number }>('/community/refresh'),
+  communityLookup: (q: string) => get<{ matches: CommunityPack[] }>('/community/lookup', { q }),
+  communityImport: (domain: string) =>
+    post<{ ok: boolean; source: CreatedSource }>('/community/import', { domain }),
+  communityShare: (id: string) => get<CommunityShare>(`/community/share/${id}`),
+  communityShareSuggestions: () =>
+    get<{ suggestions: { source_id: string; organization: string }[] }>('/community/share-suggestions'),
   restoreData: (backup_path: string) =>
     post<{ ok: boolean }>('/data/restore', { backup_path }),
 }

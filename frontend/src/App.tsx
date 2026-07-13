@@ -3,7 +3,8 @@ import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { api } from './api'
 import type {
   Job, JobDetail, Radar, SourceHealthSummary, Stats, Application, Note,
-  OnboardingAnswers, OnboardingState, OnboardingSource, DataLocation
+  OnboardingAnswers, OnboardingState, OnboardingSource, DataLocation,
+  CommunityPack, CommunityShare, CommunitySharePayload
 } from './api'
 
 // Open a URL: uses macOS `open` via Tauri command when running in the desktop
@@ -906,6 +907,185 @@ type SourceDraft = {
   notes: string
 }
 
+// ── Community source registry ─────────────────────────────────────────────────
+
+function useCommunityMatches(query: string) {
+  const [matches, setMatches] = useState<CommunityPack[]>([])
+  useEffect(() => {
+    const q = query.trim()
+    if (q.length < 3) { setMatches([]); return }
+    const timer = setTimeout(() => {
+      api.communityLookup(q).then(r => setMatches(r.matches)).catch(() => setMatches([]))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [query])
+  return matches
+}
+
+// Suggestion shown under an add-source row when the community registry already
+// has a working recipe for what the user is typing.
+function CommunitySuggestion({ query, currentUrl, onUse }: {
+  query: string
+  currentUrl: string
+  onUse: (pack: CommunityPack) => void
+}) {
+  const matches = useCommunityMatches(query)
+  const match = matches.find(m => !m.already_added)
+  if (!match || match.careers_url === currentUrl.trim()) return null
+  return (
+    <div className="col-span-3 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+      <span className="text-xs text-emerald-700">
+        ✓ <strong>{match.organization}</strong> is already set up in the community registry
+        {match.last_verified ? ` — last verified ${match.last_verified}` : ''}
+      </span>
+      <button onClick={() => onUse(match)}
+        className="ml-auto flex-shrink-0 text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
+        Use it
+      </button>
+    </div>
+  )
+}
+
+function AddOrganizationPanel({ onAdded, onError }: {
+  onAdded: (message: string) => void
+  onError: (message: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [busy, setBusy] = useState(false)
+  const matches = useCommunityMatches(query)
+  const trimmed = query.trim()
+  const looksLikeUrl = /^(https?:\/\/|[a-z0-9-]+(\.[a-z0-9-]+)+)/i.test(trimmed)
+
+  function close() { setOpen(false); setQuery('') }
+
+  function importPack(pack: CommunityPack) {
+    setBusy(true)
+    api.communityImport(pack.domain)
+      .then(() => { close(); onAdded(`Added ${pack.organization} from the community registry.`) })
+      .catch(() => onError('Could not add that community source.'))
+      .finally(() => setBusy(false))
+  }
+
+  function addManually() {
+    setBusy(true)
+    api.addSource(null, trimmed)
+      .then(() => { close(); onAdded('Source added. Run a refresh to scan it.') })
+      .catch(err => onError(err.message?.includes('409') ? 'That source is already in your list.' : 'Could not add that URL — check it is a public careers page.'))
+      .finally(() => setBusy(false))
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
+        Add organization
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-full bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <input autoFocus value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Organization name or careers URL…"
+          className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+        <button onClick={close} className="text-xs font-semibold text-slate-400 hover:text-slate-600">Cancel</button>
+      </div>
+      {matches.length > 0 && (
+        <div className="space-y-2">
+          {matches.map(pack => (
+            <div key={pack.domain} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800">{pack.organization}</p>
+                <p className="text-xs text-slate-400">
+                  {pack.domain} · {pack.platform}
+                  {pack.last_verified ? ` · last verified ${pack.last_verified}` : ''}
+                  {pack.region ? ` · ${pack.region}` : ''}
+                </p>
+              </div>
+              {pack.already_added ? (
+                <span className="ml-auto text-xs text-slate-400">Already added</span>
+              ) : (
+                <button onClick={() => importPack(pack)} disabled={busy}
+                  className="ml-auto flex-shrink-0 text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-40">
+                  Add
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {trimmed.length >= 3 && matches.length === 0 && !looksLikeUrl && (
+        <p className="text-xs text-slate-400">No shared source for that yet — paste the organization's careers page URL to set it up yourself.</p>
+      )}
+      {looksLikeUrl && !matches.some(m => !m.already_added) && (
+        <button onClick={addManually} disabled={busy}
+          className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 disabled:opacity-40">
+          Add {trimmed} as a new source
+        </button>
+      )}
+      <p className="text-xs text-slate-400">
+        Community sources are recipes shared by other Job Radar users: just the organization, careers URL, and platform.
+      </p>
+    </div>
+  )
+}
+
+function communityIssueUrl(baseIssueUrl: string, payload: CommunitySharePayload): string {
+  const base = baseIssueUrl.split('/issues/new')[0]
+  const pack = JSON.stringify(payload, null, 2)
+  return `${base}/issues/new?template=submit-source.yml`
+    + `&title=${encodeURIComponent(`[Source] ${payload.organization}`)}`
+    + `&pack=${encodeURIComponent(pack)}`
+}
+
+function ShareSourceModal({ share, onClose }: { share: CommunityShare; onClose: () => void }) {
+  const [domain, setDomain] = useState(share.payload.domain)
+  const payload: CommunitySharePayload = { ...share.payload, domain: domain.trim().toLowerCase() }
+  const ready = payload.domain.length > 0
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-6" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div>
+          <h3 className="text-base font-semibold text-slate-800">Share this source</h3>
+          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            This shares only the recipe below — the organization, its careers URL, and the platform —
+            so other Job Radar users can add it in one click. Nothing personal leaves your machine.
+            Your browser will open a pre-filled GitHub submission for you to review and send
+            (needs a free GitHub account; the whole thing takes about 30 seconds).
+          </p>
+        </div>
+        {share.domain_missing && (
+          <div>
+            <label className="text-xs font-semibold text-slate-500">Organization's own website domain</label>
+            <input value={domain} onChange={e => setDomain(e.target.value)}
+              placeholder="example.org"
+              className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+            <p className="text-[11px] text-slate-400 mt-1">
+              The careers page is hosted on a jobs platform, so the org's own domain is needed as the shared identifier.
+            </p>
+          </div>
+        )}
+        <pre className="text-[11px] leading-relaxed bg-slate-50 border border-slate-100 rounded-lg p-3 overflow-x-auto text-slate-600">
+          {JSON.stringify(payload, null, 2)}
+        </pre>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose}
+            className="text-xs px-3 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50">
+            Cancel
+          </button>
+          <button disabled={!ready}
+            onClick={() => { openExternal(communityIssueUrl(share.issue_url, payload)); onClose() }}
+            className="text-xs px-3 py-2 rounded-lg bg-slate-800 text-white font-semibold hover:bg-slate-700 disabled:opacity-40">
+            Open GitHub to submit
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SourcesView() {
   const [health, setHealth] = useState<SourceHealthSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -914,10 +1094,29 @@ function SourcesView() {
   const [draft, setDraft] = useState<SourceDraft>({ organization: '', url: '', notes: '' })
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [share, setShare] = useState<CommunityShare | null>(null)
+  const [shareNudge, setShareNudge] = useState<{ source_id: string; organization: string } | null>(null)
 
   useEffect(() => {
     loadHealth()
+    api.communityRefresh().catch(() => {}).finally(loadShareNudge)
   }, [])
+
+  function loadShareNudge() {
+    api.communityShareSuggestions()
+      .then(r => {
+        const dismissed: string[] = JSON.parse(localStorage.getItem('jr_share_nudge_dismissed') ?? '[]')
+        setShareNudge(r.suggestions.find(s => !dismissed.includes(s.source_id)) ?? null)
+      })
+      .catch(() => {})
+  }
+
+  function dismissShareNudge() {
+    if (!shareNudge) return
+    const dismissed: string[] = JSON.parse(localStorage.getItem('jr_share_nudge_dismissed') ?? '[]')
+    localStorage.setItem('jr_share_nudge_dismissed', JSON.stringify([...dismissed, shareNudge.source_id]))
+    setShareNudge(null)
+  }
 
   function loadHealth() {
     api.sourceHealth().then(h => { setHealth(h); setLoading(false) }).catch(() => setLoading(false))
@@ -981,6 +1180,12 @@ function SourcesView() {
       .finally(() => setBusyId(null))
   }
 
+  function openShare(sourceId: string) {
+    api.communityShare(sourceId)
+      .then(setShare)
+      .catch(() => setNotice('Could not prepare the share submission.'))
+  }
+
   if (loading) return <div className="flex items-center justify-center py-20 text-sm text-slate-400">Loading…</div>
   if (!health) return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -989,6 +1194,10 @@ function SourcesView() {
         className="px-4 py-2 rounded-lg bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors">
         Run first refresh
       </button>
+      <div className="w-full max-w-xl mt-2 flex flex-col items-center gap-2">
+        <AddOrganizationPanel onAdded={m => { setNotice(m); loadHealth() }} onError={m => setNotice(m)} />
+        {notice && <span className="text-xs text-slate-600">{notice}</span>}
+      </div>
     </div>
   )
 
@@ -1026,13 +1235,35 @@ function SourcesView() {
         ))}
       </div>
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-start gap-3">
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Filter sources…"
           className="w-64 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-200 bg-white" />
-        {search && <span className="text-xs text-slate-400">{results.length} result{results.length !== 1 ? 's' : ''}</span>}
-        {notice && <span className="ml-auto text-xs text-slate-600 bg-white border border-slate-200 rounded-lg px-3 py-2">{notice}</span>}
+        {search && <span className="text-xs text-slate-400 py-2">{results.length} result{results.length !== 1 ? 's' : ''}</span>}
+        {notice && <span className="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg px-3 py-2">{notice}</span>}
+        <div className="ml-auto flex-shrink-0 max-w-xl flex-1 flex justify-end">
+          <AddOrganizationPanel onAdded={m => finishAction(m)} onError={m => setNotice(m)} />
+        </div>
       </div>
+
+      {shareNudge && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-sm text-emerald-800">
+            <strong>{shareNudge.organization}</strong> is working and isn't in the community registry yet —
+            share it so anyone can add it in one click?
+          </p>
+          <div className="ml-auto flex flex-shrink-0 gap-2">
+            <button onClick={() => { openShare(shareNudge.source_id); dismissShareNudge() }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
+              Share it
+            </button>
+            <button onClick={dismissShareNudge}
+              className="text-xs px-3 py-1.5 rounded-lg text-emerald-700 font-semibold hover:bg-emerald-100">
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {issues.length > 0 && (
         <div className="mb-6">
@@ -1040,7 +1271,7 @@ function SourcesView() {
           <SourceTable rows={issues} confBadge={confBadge}
             editingId={editingId} draft={draft} setDraft={setDraft}
             busyId={busyId} onEdit={startEdit} onCancel={() => setEditingId(null)}
-            onSave={saveEdit} onAction={runSourceAction} />
+            onSave={saveEdit} onAction={runSourceAction} onShare={openShare} />
         </div>
       )}
 
@@ -1050,14 +1281,16 @@ function SourcesView() {
       <SourceTable rows={ok} confBadge={confBadge}
         editingId={editingId} draft={draft} setDraft={setDraft}
         busyId={busyId} onEdit={startEdit} onCancel={() => setEditingId(null)}
-        onSave={saveEdit} onAction={runSourceAction} />
+        onSave={saveEdit} onAction={runSourceAction} onShare={openShare} />
+
+      {share && <ShareSourceModal share={share} onClose={() => setShare(null)} />}
     </div>
   )
 }
 
 function SourceTable({
   rows, confBadge, editingId, draft, setDraft, busyId,
-  onEdit, onCancel, onSave, onAction,
+  onEdit, onCancel, onSave, onAction, onShare,
 }: {
   rows: SourceHealthSummary['results']
   confBadge: (l: string | null) => string
@@ -1070,6 +1303,7 @@ function SourceTable({
   onCancel: () => void
   onSave: (sourceId: string) => void
   onAction: (sourceId: string, action: 'checked' | 'disable' | 'enable' | 'retry' | 'delete') => void
+  onShare: (sourceId: string) => void
 }) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   if (rows.length === 0) return <p className="text-sm text-slate-400 py-4">None.</p>
@@ -1167,6 +1401,13 @@ function SourceTable({
                         className="text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
                         Retry
                       </button>
+                      {r.success && !disabled && (
+                        <button onClick={() => onShare(r.source_id)} disabled={busy}
+                          title="Share this working source with other Job Radar users"
+                          className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
+                          Share
+                        </button>
+                      )}
                       {disabled ? (
                         <button onClick={() => onAction(r.source_id, 'enable')} disabled={busy}
                           className="text-xs px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-40">
@@ -2272,6 +2513,11 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
     document.title = title
   }, [answers.name])
 
+  // Warm the community-registry cache so step 7 can suggest shared sources.
+  useEffect(() => {
+    api.communityRefresh().catch(() => {})
+  }, [])
+
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
@@ -2535,6 +2781,14 @@ function OnboardingWizard({ initialState, onTitle, onDone, onViewSources }: {
                         Checked
                       </label>
                     </div>
+                    <CommunitySuggestion
+                      query={source.organization || source.url}
+                      currentUrl={source.url}
+                      onUse={pack => updateSource(idx, {
+                        organization: pack.organization,
+                        url: pack.careers_url,
+                        verified: true,
+                      })} />
                   </div>
                 ))}
               </div>

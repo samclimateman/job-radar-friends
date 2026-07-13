@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from job_radar.api.routers import (
     applications,
     blocklist,
+    community,
     data,
     jobs,
     notes,
@@ -60,6 +61,7 @@ app.include_router(applications.router, prefix="/api")
 app.include_router(blocklist.router, prefix="/api")
 app.include_router(onboarding.router, prefix="/api")
 app.include_router(data.router, prefix="/api")
+app.include_router(community.router, prefix="/api")
 
 # Serve the built React frontend from frontend/dist if it exists
 _DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
