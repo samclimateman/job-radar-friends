@@ -1,5 +1,5 @@
 {
   "version": "0.1.4",
-  "notes": "Adds a visible beta feedback path with redacted diagnostics and a copyable report template for tester feedback.",
+  "notes": "Community sources: add organizations shared by other users in one click, and share your own working sources back. Also adds a beta feedback path with redacted diagnostics.",
   "download_url": "https://github.com/samclimateman/job-radar-friends/releases"
 }
