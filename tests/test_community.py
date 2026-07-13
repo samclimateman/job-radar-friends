@@ -14,6 +14,7 @@ from job_radar.api.routers.community import (
     community_import,
     community_lookup,
     community_share,
+    community_share_suggestions,
     community_status,
 )
 from job_radar.config.settings import get_settings
@@ -256,3 +257,30 @@ def test_api_status_reports_cache_state(data_dir):
     status = community_status()
     assert status["available"] is True
     assert status["pack_count"] == 3
+
+
+def _mark_working(source_id: str, platform: str) -> None:
+    execute(
+        """INSERT INTO source_health (source_id, platform, parser_type,
+               last_successful_at, jobs_found)
+           VALUES (?, ?, 'static_html', '2026-07-12 08:00:00', 5)""",
+        (source_id, platform),
+    )
+
+
+def test_api_share_suggestions_only_working_unshared_sources(data_dir, monkeypatch):
+    _allow_public_dns(monkeypatch)
+    init_db()
+
+    # No community index cached: never nudge (can't tell what's shared).
+    assert community_share_suggestions() == {"suggestions": []}
+
+    _write_cache(data_dir)
+    in_registry = add_source("https://www.bruegel.org/careers", "Bruegel")
+    _mark_working(in_registry.id, in_registry.platform)
+    novel = add_source("https://www.wri.org/careers", "World Resources Institute")
+    _mark_working(novel.id, novel.platform)
+    add_source("https://www.e3g.org/about/careers/", "E3G")  # no health row: never scanned
+
+    result = community_share_suggestions()
+    assert [s["organization"] for s in result["suggestions"]] == ["World Resources Institute"]

@@ -350,6 +350,8 @@ export const api = {
   communityImport: (domain: string) =>
     post<{ ok: boolean; source: CreatedSource }>('/community/import', { domain }),
   communityShare: (id: string) => get<CommunityShare>(`/community/share/${id}`),
+  communityShareSuggestions: () =>
+    get<{ suggestions: { source_id: string; organization: string }[] }>('/community/share-suggestions'),
   restoreData: (backup_path: string) =>
     post<{ ok: boolean }>('/data/restore', { backup_path }),
 }

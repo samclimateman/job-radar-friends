@@ -101,6 +101,35 @@ def community_import(body: CommunityImport):
     }
 
 
+@router.get("/share-suggestions")
+def community_share_suggestions():
+    """Working sources the user set up that the registry doesn't have yet."""
+    index = community.load_cached_index()
+    if index is None:
+        return {"suggestions": []}
+    packs = index.get("packs", [])
+    known_domains = {p.get("domain") for p in packs}
+    known_urls = {p.get("careers_url") for p in packs}
+    rows = execute(
+        """SELECT s.id, s.url, s.organization
+             FROM sources s
+             JOIN source_health h ON h.source_id = s.id
+            WHERE s.status != 'disabled'
+              AND h.error_status IS NULL
+              AND h.last_successful_at IS NOT NULL
+              AND h.jobs_found > 0"""
+    )
+    suggestions = []
+    for row in rows:
+        domain = community.normalize_domain(row["url"])
+        if row["url"] in known_urls or (domain and domain in known_domains):
+            continue
+        suggestions.append(
+            {"source_id": row["id"], "organization": row["organization"] or row["url"]}
+        )
+    return {"suggestions": suggestions}
+
+
 @router.get("/share/{source_id}")
 def community_share(source_id: str):
     rows = execute(

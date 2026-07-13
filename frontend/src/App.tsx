@@ -1052,7 +1052,8 @@ function ShareSourceModal({ share, onClose }: { share: CommunityShare; onClose: 
           <p className="text-xs text-slate-500 mt-1 leading-relaxed">
             This shares only the recipe below — the organization, its careers URL, and the platform —
             so other Job Radar users can add it in one click. Nothing personal leaves your machine.
-            Your browser will open a pre-filled GitHub submission for you to review and send.
+            Your browser will open a pre-filled GitHub submission for you to review and send
+            (needs a free GitHub account; the whole thing takes about 30 seconds).
           </p>
         </div>
         {share.domain_missing && (
@@ -1094,11 +1095,28 @@ function SourcesView() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [share, setShare] = useState<CommunityShare | null>(null)
+  const [shareNudge, setShareNudge] = useState<{ source_id: string; organization: string } | null>(null)
 
   useEffect(() => {
     loadHealth()
-    api.communityRefresh().catch(() => {})
+    api.communityRefresh().catch(() => {}).finally(loadShareNudge)
   }, [])
+
+  function loadShareNudge() {
+    api.communityShareSuggestions()
+      .then(r => {
+        const dismissed: string[] = JSON.parse(localStorage.getItem('jr_share_nudge_dismissed') ?? '[]')
+        setShareNudge(r.suggestions.find(s => !dismissed.includes(s.source_id)) ?? null)
+      })
+      .catch(() => {})
+  }
+
+  function dismissShareNudge() {
+    if (!shareNudge) return
+    const dismissed: string[] = JSON.parse(localStorage.getItem('jr_share_nudge_dismissed') ?? '[]')
+    localStorage.setItem('jr_share_nudge_dismissed', JSON.stringify([...dismissed, shareNudge.source_id]))
+    setShareNudge(null)
+  }
 
   function loadHealth() {
     api.sourceHealth().then(h => { setHealth(h); setLoading(false) }).catch(() => setLoading(false))
@@ -1227,6 +1245,25 @@ function SourcesView() {
           <AddOrganizationPanel onAdded={m => finishAction(m)} onError={m => setNotice(m)} />
         </div>
       </div>
+
+      {shareNudge && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-sm text-emerald-800">
+            <strong>{shareNudge.organization}</strong> is working and isn't in the community registry yet —
+            share it so anyone can add it in one click?
+          </p>
+          <div className="ml-auto flex flex-shrink-0 gap-2">
+            <button onClick={() => { openShare(shareNudge.source_id); dismissShareNudge() }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">
+              Share it
+            </button>
+            <button onClick={dismissShareNudge}
+              className="text-xs px-3 py-1.5 rounded-lg text-emerald-700 font-semibold hover:bg-emerald-100">
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {issues.length > 0 && (
         <div className="mb-6">
