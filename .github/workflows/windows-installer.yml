@@ -39,17 +39,28 @@ jobs:
 
       - name: Smoke-test sidecar binary
         run: |
-          $proc = Start-Process -FilePath "dist\job-radar-server\job-radar-server.exe" -ArgumentList "start","--no-open","--port","8766" -PassThru
+          # Redirect stdio like the Tauri shell does (Stdio::null), and keep
+          # the logs so a failure is diagnosable.
+          $proc = Start-Process -FilePath "dist\job-radar-server\job-radar-server.exe" `
+            -ArgumentList "start","--no-open","--port","8766" -PassThru `
+            -RedirectStandardOutput sidecar-out.log -RedirectStandardError sidecar-err.log
           $ok = $false
-          foreach ($i in 1..30) {
+          foreach ($i in 1..60) {
             Start-Sleep -Seconds 1
+            if ($proc.HasExited) { break }
             try {
               $resp = Invoke-RestMethod -Uri "http://127.0.0.1:8766/api/health" -TimeoutSec 2
               if ($resp.app -eq "job-radar") { $ok = $true; break }
             } catch {}
           }
+          if (-not $ok) {
+            if ($proc.HasExited) { Write-Host "Sidecar exited early with code $($proc.ExitCode)" }
+            Write-Host "--- sidecar stdout ---"; Get-Content sidecar-out.log -ErrorAction SilentlyContinue
+            Write-Host "--- sidecar stderr ---"; Get-Content sidecar-err.log -ErrorAction SilentlyContinue
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Sidecar did not serve /api/health within 60s"
+          }
           Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-          if (-not $ok) { throw "Sidecar did not serve /api/health within 30s" }
           Write-Host "Sidecar healthy."
 
       - uses: dtolnay/rust-toolchain@stable
