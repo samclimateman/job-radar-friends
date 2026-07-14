@@ -185,7 +185,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _ensure_stdio() -> None:
+    """Give windowed PyInstaller builds usable stdio.
+
+    On Windows, a windowed (console=False) build launched without inherited
+    handles starts with sys.stdout/sys.stderr set to None, which breaks
+    print() and uvicorn's logging. Substitute devnull so the server runs the
+    same regardless of how it was spawned.
+    """
+    import os
+
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _ensure_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     if not hasattr(args, "func"):

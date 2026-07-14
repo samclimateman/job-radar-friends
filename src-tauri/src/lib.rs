@@ -32,39 +32,52 @@ fn is_job_radar_server(port: u16) -> bool {
     response.contains("\"app\":\"job-radar\"") || response.contains("\"app\": \"job-radar\"")
 }
 
+/// Sidecar binary filename: PyInstaller appends .exe on Windows.
+fn sidecar_name() -> String {
+    format!("job-radar-server{}", std::env::consts::EXE_SUFFIX)
+}
+
 /// Resolve the bundled sidecar binary.
 ///
 /// Search order:
-/// 1. Next to the Tauri binary (Contents/MacOS/) — packaged .app
-/// 2. Contents/Resources/job-radar-server/ — if copied there post-build
-/// 3. dist/job-radar-server/ relative to repo root — dev PyInstaller build
+/// 1. Next to the Tauri binary — packaged .app (macOS) or install dir (Windows)
+/// 2. job-radar-server/ directory next to the binary — Windows NSIS resources
+/// 3. Contents/Resources/job-radar-server/ — macOS .app, copied post-build
+/// 4. dist/job-radar-server/ relative to repo root — dev PyInstaller build
 fn find_sidecar() -> Option<std::path::PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let exe = exe.canonicalize().unwrap_or(exe);
-    let macos_dir = exe.parent()?;
+    let bin_dir = exe.parent()?;
+    let name = sidecar_name();
 
     // 1. Packaged: next to the Tauri binary
-    let next_to_bin = macos_dir.join("job-radar-server");
+    let next_to_bin = bin_dir.join(&name);
     if next_to_bin.exists() {
         return Some(next_to_bin);
     }
 
-    // 2. Packaged: in Contents/Resources/job-radar-server/
-    let resources = macos_dir
+    // 2. Packaged: job-radar-server/ resource dir next to the binary (Windows)
+    let resource_sibling = bin_dir.join("job-radar-server").join(&name);
+    if resource_sibling.exists() {
+        return Some(resource_sibling);
+    }
+
+    // 3. Packaged: in Contents/Resources/job-radar-server/ (macOS)
+    let resources = bin_dir
         .parent()  // Contents/
-        .map(|p| p.join("Resources/job-radar-server/job-radar-server"));
+        .map(|p| p.join("Resources/job-radar-server").join(&name));
     if let Some(p) = resources {
         if p.exists() {
             return Some(p);
         }
     }
 
-    // 3. Dev: PyInstaller dist relative to repo root (walk up to pyproject.toml)
+    // 4. Dev: PyInstaller dist relative to repo root (walk up to pyproject.toml)
     let mut p = exe.as_path();
     for _ in 0..10 {
         if let Some(parent) = p.parent() {
             if parent.join("pyproject.toml").exists() {
-                let candidate = parent.join("dist/job-radar-server/job-radar-server");
+                let candidate = parent.join("dist/job-radar-server").join(&name);
                 if candidate.exists() {
                     return Some(candidate);
                 }
@@ -105,12 +118,18 @@ fn start_server() -> (Option<std::process::Child>, Vec<String>) {
         return (None, vec![msg]);
     };
 
-    let child = std::process::Command::new(&sidecar)
+    let mut command = std::process::Command::new(&sidecar);
+    command
         .args(["start", "--no-open", "--port", &PORT.to_string()])
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok();
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let child = command.spawn().ok();
 
     if child.is_none() {
         let msg = format!("Failed to start Job Radar server from: {}", sidecar.display());
@@ -140,13 +159,32 @@ fn stop_server(server_proc: &ServerProcess) {
 
 /// Returns the Job Radar data directory (~/.job-radar)
 fn dirs_path() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
     std::path::PathBuf::from(home).join(".job-radar")
 }
 
 #[tauri::command]
 fn open_external(url: String) {
+    // Only http(s) URLs may leave the app; everything else is dropped.
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return;
+    }
+    #[cfg(target_os = "macos")]
     let _ = std::process::Command::new("open").arg(&url).spawn();
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        // `start` is a cmd builtin; the empty string is the window title slot.
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", "", &url])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
 }
 
 fn encode_query_component(value: &str) -> String {
