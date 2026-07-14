@@ -4,19 +4,20 @@ This is the current practical install path for a small beta (macOS; Windows expe
 
 ## Install
 
-### macOS — GitHub Release DMG
+### macOS — direct download
 
 1. Download the latest beta DMG:
-   `https://github.com/samclimateman/job-radar-friends/releases/latest`
+   `https://github.com/samclimateman/job-radar-friends/releases/latest/download/Job.Radar.dmg`
 2. Open `Job.Radar.dmg`.
 3. Drag **Job Radar.app** to **Applications**.
 4. Open **Job Radar**.
 
 This beta is not Apple Developer ID notarized yet. If macOS blocks the first launch, right-click **Job Radar.app**, choose **Open**, then confirm.
 
-### Windows — installer (experimental)
+### Windows — direct download (experimental)
 
-1. Download `Job Radar_<version>_x64-setup.exe` from the latest release (when attached).
+1. Download the latest beta installer:
+   `https://github.com/samclimateman/job-radar-friends/releases/latest/download/Job.Radar.Windows.Setup.exe`
 2. Run the installer. It installs for your user only — no admin prompt.
 3. Windows SmartScreen will warn because the beta is unsigned: click **More info**, then **Run anyway**. This is the Windows equivalent of the macOS right-click → Open step.
 4. If the window is blank on first launch, Windows may be installing the WebView2 runtime — give it a moment and relaunch.
