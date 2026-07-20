@@ -4,31 +4,31 @@ version = "0.1.4"
 description = "Local-first career opportunity radar"
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=2.7",
-    "pydantic-settings>=2.3",
-    "requests>=2.31",
-    "beautifulsoup4>=4.12",
-    "pyyaml>=6.0",
-    "rich>=13.7",
-    "feedparser>=6.0",
-    "fastapi>=0.111",
-    "uvicorn>=0.30",
-    "python-multipart>=0.0.9",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "requests>=2.34.2",
+    "beautifulsoup4>=4.15.0",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "feedparser>=6.0.12",
+    "fastapi>=0.139.2",
+    "uvicorn>=0.51.0",
+    "python-multipart>=0.0.32",
     "defusedxml>=0.7.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.2",
-    "ruff>=0.4",
-    "pyinstaller>=6.0",
+    "pytest>=9.1.1",
+    "ruff>=0.15.22",
+    "pyinstaller>=6.21.0",
 ]
 
 [project.scripts]
 job-radar = "job_radar.cli:main"
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=83.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
